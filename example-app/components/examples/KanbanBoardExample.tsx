@@ -97,7 +97,6 @@ export function KanbanBoardExample({ onBack }: KanbanBoardExampleProps) {
         contentContainerStyle={styles.boardContent}
         columnStyle={styles.column}
         columnContentStyle={styles.columnContent}
-        itemContainerStyle={styles.itemContainer}
         activeDropStyle={styles.activeDrop}
         overlayStyle={styles.overlay}
         renderColumnHeader={(column) => (
@@ -189,10 +188,6 @@ const styles = StyleSheet.create({
   columnContent: {
     paddingBottom: 8,
   },
-  itemContainer: {
-    width: "75%",
-    alignSelf: "center",
-  },
   card: {
     minHeight: 76,
     borderRadius: 12,
@@ -239,9 +234,8 @@ const styles = StyleSheet.create({
   activeDrop: {
     backgroundColor: "rgba(88, 166, 255, 0.08)",
     borderColor: "rgba(88, 166, 255, 0.55)",
-    borderRadius: 12,
   },
   overlay: {
-    width: 183,
+    width: 244,
   },
 });

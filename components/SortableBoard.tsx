@@ -1,25 +1,13 @@
-import React, {
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-} from "react";
+import React, { useCallback, useMemo, useRef } from "react";
 import { LayoutChangeEvent, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, {
   SharedValue,
   useAnimatedStyle,
   useSharedValue,
-  withTiming,
 } from "react-native-reanimated";
 import { DropProvider } from "../context/DropContext";
-import {
-  SlotsContext,
-  type DropProviderRef,
-  type DraggingPayload,
-  type SlotsContextValue,
-} from "../types/context";
+import type { DropProviderRef, DraggingPayload } from "../types/context";
 import type {
   SortableBoardColumn,
   SortableBoardItem,
@@ -37,18 +25,6 @@ interface BoardDragData<TItem extends SortableBoardItem> {
   sourceIndex: number;
 }
 
-interface BoardDropTarget {
-  columnId: string;
-  index: number;
-  type: "column" | "item" | "append";
-}
-
-interface BoardPreviewLocation {
-  itemId: string;
-  columnId: string;
-  index: number;
-}
-
 interface SortableBoardCardProps<TItem extends SortableBoardItem> {
   item: TItem;
   columnId: string;
@@ -56,11 +32,6 @@ interface SortableBoardCardProps<TItem extends SortableBoardItem> {
   itemGap: number;
   activationDelay: number;
   activeItemId: SharedValue<string>;
-  activeSourceColumnId: SharedValue<string>;
-  activeSourceIndex: SharedValue<number>;
-  activeSlotHeight: SharedValue<number>;
-  previewColumnId: SharedValue<string>;
-  previewIndex: SharedValue<number>;
   itemContainerStyle: SortableBoardProps<
     TItem,
     SortableBoardColumn<TItem>
@@ -87,11 +58,6 @@ function SortableBoardCard<TItem extends SortableBoardItem>({
   itemGap,
   activationDelay,
   activeItemId,
-  activeSourceColumnId,
-  activeSourceIndex,
-  activeSlotHeight,
-  previewColumnId,
-  previewIndex,
   itemContainerStyle,
   activeDropStyle,
   renderItem,
@@ -112,56 +78,12 @@ function SortableBoardCard<TItem extends SortableBoardItem>({
   const sourceAnimatedStyle = useAnimatedStyle(() => {
     "worklet";
     const isActive = activeItemId.value === item.id;
-    const sourceColumnId = activeSourceColumnId.value;
-    const sourceIndex = activeSourceIndex.value;
-    const targetColumnId = previewColumnId.value;
-    const targetIndex = previewIndex.value;
-    const slotHeight = activeSlotHeight.value;
-    let translateY = 0;
-
-    if (!isActive && slotHeight > 0) {
-      if (sourceColumnId === targetColumnId && columnId === sourceColumnId) {
-        if (
-          targetIndex > sourceIndex &&
-          itemIndex > sourceIndex &&
-          itemIndex < targetIndex
-        ) {
-          translateY = -slotHeight;
-        } else if (
-          targetIndex < sourceIndex &&
-          itemIndex >= targetIndex &&
-          itemIndex < sourceIndex
-        ) {
-          translateY = slotHeight;
-        }
-      } else if (columnId === sourceColumnId && itemIndex > sourceIndex) {
-        translateY = -slotHeight;
-      } else if (columnId === targetColumnId && itemIndex >= targetIndex) {
-        translateY = slotHeight;
-      }
-    }
-
     return {
       opacity: isActive ? 0 : 1,
       zIndex: isActive ? 1000 : 0,
       elevation: isActive ? 1000 : 0,
-      transform: [
-        {
-          translateY: isActive ? 0 : withTiming(translateY, { duration: 160 }),
-        },
-      ] as const,
     };
-  }, [
-    activeItemId,
-    activeSlotHeight,
-    activeSourceColumnId,
-    activeSourceIndex,
-    columnId,
-    item.id,
-    itemIndex,
-    previewColumnId,
-    previewIndex,
-  ]);
+  }, [activeItemId, item.id]);
 
   return (
     <Droppable<BoardDragData<TItem>>
@@ -172,164 +94,26 @@ function SortableBoardCard<TItem extends SortableBoardItem>({
       activeStyle={activeDropStyle}
       style={[{ marginBottom: itemGap }, itemContainerStyle]}
     >
-      <Animated.View style={sourceAnimatedStyle}>
-        <Draggable<BoardDragData<TItem>>
-          data={dragData}
-          draggableId={`board-draggable-${item.id}`}
-          preDragDelay={activationDelay}
-          collisionAlgorithm="center"
-          snapBackAfterDrop
-        >
-          <Draggable.Handle style={styles.cardHandle}>
-            {renderItem({
-              item,
-              columnId,
-              index: itemIndex,
-              isDragging: false,
-              isOverlay: false,
-            })}
-          </Draggable.Handle>
-        </Draggable>
-      </Animated.View>
+      <Draggable<BoardDragData<TItem>>
+        data={dragData}
+        draggableId={`board-draggable-${item.id}`}
+        preDragDelay={activationDelay}
+        collisionAlgorithm="center"
+        snapBackAfterDrop
+        style={sourceAnimatedStyle}
+      >
+        <Draggable.Handle style={styles.cardHandle}>
+          {renderItem({
+            item,
+            columnId,
+            index: itemIndex,
+            isDragging: false,
+            isOverlay: false,
+          })}
+        </Draggable.Handle>
+      </Draggable>
     </Droppable>
   );
-}
-
-interface BoardDragPreviewMonitorProps {
-  activeColumnId: SharedValue<string>;
-  activeSlotHeight: SharedValue<number>;
-  activeSourceColumnId: SharedValue<string>;
-  activeSourceIndex: SharedValue<number>;
-  dropTargets: Map<string, BoardDropTarget>;
-  itemGap: number;
-  previewColumnId: SharedValue<string>;
-  previewIndex: SharedValue<number>;
-  previewLocationRef: React.MutableRefObject<BoardPreviewLocation | null>;
-}
-
-function BoardDragPreviewMonitor({
-  activeColumnId,
-  activeSlotHeight,
-  activeSourceColumnId,
-  activeSourceIndex,
-  dropTargets,
-  itemGap,
-  previewColumnId,
-  previewIndex,
-  previewLocationRef,
-}: BoardDragPreviewMonitorProps) {
-  const {
-    activeHoverSlotId,
-    getSlots,
-    registerDraggingListener,
-    unregisterDraggingListener,
-  } = useContext(SlotsContext) as SlotsContextValue<BoardDragData<any>>;
-  const listenerId = useRef(
-    `sortable-board-preview-${Math.random().toString(36).slice(2, 11)}`
-  ).current;
-  const latestPayloadRef = useRef<DraggingPayload<BoardDragData<any>> | null>(
-    null
-  );
-
-  const updatePreview = useCallback(
-    (columnId: string, index: number, itemId: string) => {
-      const currentPreview = previewLocationRef.current;
-      if (
-        currentPreview?.itemId === itemId &&
-        currentPreview.columnId === columnId &&
-        currentPreview.index === index
-      ) {
-        return;
-      }
-
-      previewLocationRef.current = { itemId, columnId, index };
-      previewColumnId.value = columnId;
-      previewIndex.value = index;
-      activeColumnId.value = columnId;
-    },
-    [activeColumnId, previewColumnId, previewIndex, previewLocationRef]
-  );
-
-  const updatePreviewFromHover = useCallback(
-    (
-      payload: DraggingPayload<BoardDragData<any>>,
-      hoveredSlotId: number | null
-    ) => {
-      const centerY = payload.y + payload.ty + payload.height / 2;
-      const slots = Object.values(getSlots());
-      const sourceColumnId = activeSourceColumnId.value;
-      const sourceIndex = activeSourceIndex.value;
-      const hoveredSlot =
-        hoveredSlotId === null ? undefined : getSlots()[hoveredSlotId];
-      const hoveredTarget = hoveredSlot
-        ? dropTargets.get(hoveredSlot.id)
-        : undefined;
-
-      if (!hoveredTarget) {
-        updatePreview(sourceColumnId, sourceIndex, payload.itemData.itemId);
-        return;
-      }
-
-      const columnId = hoveredTarget.columnId;
-      const itemSlots = slots
-        .map((slot) => ({ slot, target: dropTargets.get(slot.id) }))
-        .filter(
-          (
-            entry
-          ): entry is {
-            slot: (typeof slots)[number];
-            target: BoardDropTarget;
-          } =>
-            entry.target?.type === "item" && entry.target.columnId === columnId
-        )
-        .sort((a, b) => a.target.index - b.target.index);
-
-      const nextIndex =
-        hoveredTarget.type === "append"
-          ? hoveredTarget.index
-          : (itemSlots.find(({ slot }) => centerY < slot.y + slot.height / 2)
-              ?.target.index ?? itemSlots.length);
-
-      updatePreview(columnId, nextIndex, payload.itemData.itemId);
-    },
-    [
-      activeSourceColumnId,
-      activeSourceIndex,
-      dropTargets,
-      getSlots,
-      updatePreview,
-    ]
-  );
-
-  const handleDragging = useCallback(
-    (payload: DraggingPayload<BoardDragData<any>>) => {
-      latestPayloadRef.current = payload;
-      if (activeSlotHeight.value === 0) {
-        activeSlotHeight.value = payload.height + itemGap;
-      }
-      updatePreviewFromHover(payload, activeHoverSlotId);
-    },
-    [activeHoverSlotId, activeSlotHeight, itemGap, updatePreviewFromHover]
-  );
-
-  useEffect(() => {
-    const payload = latestPayloadRef.current;
-    if (payload) {
-      updatePreviewFromHover(payload, activeHoverSlotId);
-    }
-  }, [activeHoverSlotId, updatePreviewFromHover]);
-
-  useEffect(() => {
-    registerDraggingListener(listenerId, handleDragging);
-    return () => unregisterDraggingListener(listenerId);
-  }, [
-    handleDragging,
-    listenerId,
-    registerDraggingListener,
-    unregisterDraggingListener,
-  ]);
-
-  return null;
 }
 
 interface BoardColumnContainerProps {
@@ -469,14 +253,8 @@ export function SortableBoard<
   const rootPagePositionRef = useRef({ x: 0, y: 0 });
   const activeItemId = useSharedValue("");
   const activeColumnId = useSharedValue("");
-  const activeSourceColumnId = useSharedValue("");
-  const activeSourceIndex = useSharedValue(-1);
-  const activeSlotHeight = useSharedValue(0);
-  const previewColumnId = useSharedValue("");
-  const previewIndex = useSharedValue(-1);
   const overlayX = useSharedValue(0);
   const overlayY = useSharedValue(0);
-  const previewLocationRef = useRef<BoardPreviewLocation | null>(null);
 
   const itemLocations = useMemo(() => {
     const locations = new Map<
@@ -491,32 +269,6 @@ export function SortableBoard<
     });
 
     return locations;
-  }, [columns]);
-
-  const dropTargets = useMemo(() => {
-    const targets = new Map<string, BoardDropTarget>();
-
-    columns.forEach((column) => {
-      targets.set(`board-column-${column.id}`, {
-        columnId: column.id,
-        index: column.items.length,
-        type: "column",
-      });
-      column.items.forEach((item, index) => {
-        targets.set(`board-item-${column.id}-${item.id}`, {
-          columnId: column.id,
-          index,
-          type: "item",
-        });
-      });
-      targets.set(`board-append-${column.id}`, {
-        columnId: column.id,
-        index: column.items.length,
-        type: "append",
-      });
-    });
-
-    return targets;
   }, [columns]);
 
   const measureRoot = useCallback(() => {
@@ -539,14 +291,6 @@ export function SortableBoard<
       targetColumnId: string,
       beforeItemId?: string
     ) => {
-      const previewLocation = previewLocationRef.current;
-      if (previewLocation?.itemId === dragData.itemId) {
-        targetColumnId = previewLocation.columnId;
-        beforeItemId = columns
-          .find((column) => column.id === targetColumnId)
-          ?.items.at(previewLocation.index)?.id;
-      }
-
       if (beforeItemId === dragData.itemId) {
         return;
       }
@@ -627,34 +371,13 @@ export function SortableBoard<
         : dragData;
       activeItemId.value = nextDragData.itemId;
       activeColumnId.value = nextDragData.sourceColumnId;
-      activeSourceColumnId.value = nextDragData.sourceColumnId;
-      activeSourceIndex.value = nextDragData.sourceIndex;
-      activeSlotHeight.value = 0;
-      previewColumnId.value = nextDragData.sourceColumnId;
-      previewIndex.value = nextDragData.sourceIndex;
-      previewLocationRef.current = {
-        itemId: nextDragData.itemId,
-        columnId: nextDragData.sourceColumnId,
-        index: nextDragData.sourceIndex,
-      };
       onDragStart?.(
         nextDragData.item,
         nextDragData.sourceColumnId,
         nextDragData.sourceIndex
       );
     },
-    [
-      activeColumnId,
-      activeItemId,
-      activeSlotHeight,
-      activeSourceColumnId,
-      activeSourceIndex,
-      itemLocations,
-      measureRoot,
-      onDragStart,
-      previewColumnId,
-      previewIndex,
-    ]
+    [activeColumnId, activeItemId, itemLocations, measureRoot, onDragStart]
   );
 
   const handleDragging = useCallback(
@@ -669,24 +392,9 @@ export function SortableBoard<
     (dragData: BoardDragData<TItem>) => {
       activeItemId.value = "";
       activeColumnId.value = "";
-      activeSourceColumnId.value = "";
-      activeSourceIndex.value = -1;
-      activeSlotHeight.value = 0;
-      previewColumnId.value = "";
-      previewIndex.value = -1;
-      previewLocationRef.current = null;
       onDragEnd?.(dragData.item);
     },
-    [
-      activeColumnId,
-      activeItemId,
-      activeSlotHeight,
-      activeSourceColumnId,
-      activeSourceIndex,
-      onDragEnd,
-      previewColumnId,
-      previewIndex,
-    ]
+    [activeColumnId, activeItemId, onDragEnd]
   );
 
   return (
@@ -703,18 +411,6 @@ export function SortableBoard<
           onDragging={handleDragging}
           onDragEnd={handleDragEnd}
         >
-          <BoardDragPreviewMonitor
-            activeColumnId={activeColumnId}
-            activeSlotHeight={activeSlotHeight}
-            activeSourceColumnId={activeSourceColumnId}
-            activeSourceIndex={activeSourceIndex}
-            dropTargets={dropTargets}
-            itemGap={itemGap}
-            previewColumnId={previewColumnId}
-            previewIndex={previewIndex}
-            previewLocationRef={previewLocationRef}
-          />
-
           <DropScrollView
             horizontal
             autoScroll={autoScroll}
@@ -766,11 +462,6 @@ export function SortableBoard<
                             itemGap={itemGap}
                             activationDelay={activationDelay}
                             activeItemId={activeItemId}
-                            activeSourceColumnId={activeSourceColumnId}
-                            activeSourceIndex={activeSourceIndex}
-                            activeSlotHeight={activeSlotHeight}
-                            previewColumnId={previewColumnId}
-                            previewIndex={previewIndex}
                             itemContainerStyle={itemContainerStyle}
                             activeDropStyle={activeDropStyle}
                             renderItem={renderItem}
