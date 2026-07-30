@@ -138,6 +138,7 @@ export interface UseDraggableOptions<TData = unknown> {
 
   /**
    * Callback fired when dragging ends (regardless of whether it was dropped successfully).
+   * For a valid drop, this runs after the target droppable's `onDrop` handler.
    *
    * @param data - The data associated with the draggable item
    *

@@ -287,7 +287,8 @@ export interface DropProviderProps {
   onDragStart?: (data: any) => void;
 
   /**
-   * Global callback fired when any drag operation ends.
+   * Global callback fired when any drag operation ends. For a valid drop,
+   * this runs after the target droppable's `onDrop` handler.
    * @param data - The data associated with the draggable item
    */
   onDragEnd?: (data: any) => void;

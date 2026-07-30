@@ -377,6 +377,14 @@ export const useDraggable = <TData = unknown>(
     [animationFunction, tx, ty]
   );
 
+  const finishDragLifecycle = useCallback(
+    (draggableData: TData) => {
+      onDragEnd?.(draggableData);
+      contextOnDragEnd?.(draggableData, internalDraggableId);
+    },
+    [onDragEnd, contextOnDragEnd, internalDraggableId]
+  );
+
   const performCollisionCheck = useCallback(
     (
       draggableX: number,
@@ -543,6 +551,7 @@ export const useDraggable = <TData = unknown>(
       }
 
       scheduleOnUI(animateDragEndPosition, finalTxValue, finalTyValue);
+      finishDragLifecycle(draggableData);
     },
     [
       getSlots,
@@ -555,6 +564,7 @@ export const useDraggable = <TData = unknown>(
       unregisterDroppedItem,
       hasAvailableCapacity,
       snapBackAfterDrop,
+      finishDragLifecycle,
     ]
   );
 
@@ -682,11 +692,6 @@ export const useDraggable = <TData = unknown>(
           if (!dragStarted.value) return;
           dragStarted.value = false;
 
-          if (onDragEnd) scheduleOnRN(onDragEnd, data);
-          if (contextOnDragEnd) {
-            scheduleOnRN(contextOnDragEnd, data, internalDraggableId);
-          }
-
           if (success) {
             scheduleOnRN(
               processDropAndAnimate,
@@ -702,6 +707,7 @@ export const useDraggable = <TData = unknown>(
             animateDragEndPosition(0, 0);
             scheduleOnRN(setState, DraggableState.IDLE);
             scheduleOnRN(unregisterDroppedItem, internalDraggableId);
+            scheduleOnRN(finishDragLifecycle, data);
           }
 
           scheduleOnRN(setActiveHoverSlot, null);
@@ -717,7 +723,6 @@ export const useDraggable = <TData = unknown>(
       itemW,
       itemH,
       onDragStart,
-      onDragEnd,
       data,
       processDropAndAnimate,
       updateHoverState,
@@ -734,13 +739,13 @@ export const useDraggable = <TData = unknown>(
       updateDraggablePositionWorklet,
       contextOnDragging,
       contextOnDragStart,
-      contextOnDragEnd,
       nodeReady,
       preDragDelay,
       dragStarted,
       internalDraggableId,
       animateDragEndPosition,
       unregisterDroppedItem,
+      finishDragLifecycle,
     ]
   );
 

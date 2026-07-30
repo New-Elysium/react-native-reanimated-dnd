@@ -109,7 +109,7 @@ const taskData = { id: "1", title: "Complete project", priority: "high" };
 
 - **Type**: `(data: TData) => void`
 - **Required**: No
-- **Description**: Callback fired when dragging ends (regardless of whether it was dropped successfully).
+- **Description**: Callback fired when dragging ends (regardless of whether it was dropped successfully). For a valid drop, the target droppable's `onDrop` runs first.
 
 ```tsx
 <Draggable

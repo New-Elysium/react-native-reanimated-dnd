@@ -86,7 +86,7 @@ const { animatedViewProps, gesture } = useDraggable({
 
 - **Type**: `(data: TData) => void`
 - **Required**: No
-- **Description**: Callback fired when dragging ends (regardless of whether it was dropped successfully).
+- **Description**: Callback fired when dragging ends (regardless of whether it was dropped successfully). For a valid drop, the target droppable's `onDrop` runs first.
 
 ```tsx
 const { animatedViewProps, gesture } = useDraggable({
