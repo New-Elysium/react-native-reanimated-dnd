@@ -209,6 +209,18 @@ const { animatedViewProps, gesture } = useDraggable({
 });
 ```
 
+##### snapBackAfterDrop
+
+- **Type**: `boolean`
+- **Default**: `false`
+- **Description**: Return to the original position after a successful drop. The droppable's `onDrop` callback still runs, and the item is not retained in the provider's dropped-items map.
+
+```tsx
+const draggable = useDraggable({
+  data: taskData,
+  snapBackAfterDrop: true,
+});
+```
 
 ## Return Value
 

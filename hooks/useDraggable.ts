@@ -153,6 +153,7 @@ export const useDraggable = <TData = unknown>(
     dragBoundsRef,
     dragAxis = "both",
     collisionAlgorithm = "intersect",
+    snapBackAfterDrop = false,
   } = options;
 
   // Create animated ref first
@@ -462,14 +463,18 @@ export const useDraggable = <TData = unknown>(
           hitSlotData.onDrop(draggableData);
         }
 
-        scheduleOnRN(
-          registerDroppedItem,
-          internalDraggableId,
-          hitSlotData.id,
-          draggableData
-        );
-
-        scheduleOnRN(setState, DraggableState.DROPPED);
+        if (snapBackAfterDrop) {
+          scheduleOnRN(unregisterDroppedItem, internalDraggableId);
+          scheduleOnRN(setState, DraggableState.IDLE);
+        } else {
+          scheduleOnRN(
+            registerDroppedItem,
+            internalDraggableId,
+            hitSlotData.id,
+            draggableData
+          );
+          scheduleOnRN(setState, DraggableState.DROPPED);
+        }
 
         const alignment: DropAlignment = hitSlotData.dropAlignment || "center";
         const offset: DropOffset = hitSlotData.dropOffset || { x: 0, y: 0 };
@@ -522,8 +527,12 @@ export const useDraggable = <TData = unknown>(
         const draggableTargetX = targetX + offset.x;
         const draggableTargetY = targetY + offset.y;
 
-        finalTxValue = draggableTargetX - currentOriginX;
-        finalTyValue = draggableTargetY - currentOriginY;
+        finalTxValue = snapBackAfterDrop
+          ? 0
+          : draggableTargetX - currentOriginX;
+        finalTyValue = snapBackAfterDrop
+          ? 0
+          : draggableTargetY - currentOriginY;
       } else {
         // No hit slot or no capacity available - reset to original position and set state to IDLE
         finalTxValue = 0;
@@ -545,6 +554,7 @@ export const useDraggable = <TData = unknown>(
       registerDroppedItem,
       unregisterDroppedItem,
       hasAvailableCapacity,
+      snapBackAfterDrop,
     ]
   );
 

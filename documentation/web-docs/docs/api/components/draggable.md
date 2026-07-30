@@ -73,6 +73,18 @@ const taskData = { id: "1", title: "Complete project", priority: "high" };
 - **Required**: No
 - **Description**: Unique identifier for this draggable item. If not provided, one will be generated automatically.
 
+#### snapBackAfterDrop
+
+- **Type**: `boolean`
+- **Default**: `false`
+- **Description**: Animate back to the original position after a valid drop while still calling the target's `onDrop`.
+
+```tsx
+<Draggable data={data} snapBackAfterDrop>
+  <Text>Return home after every drop</Text>
+</Draggable>
+```
+
 ### Callback Props
 
 #### onDragStart

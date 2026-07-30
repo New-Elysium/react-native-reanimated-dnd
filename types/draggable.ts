@@ -264,6 +264,15 @@ export interface UseDraggableOptions<TData = unknown> {
    * @see {@link CollisionAlgorithm} for detailed explanation of each algorithm
    */
   collisionAlgorithm?: CollisionAlgorithm;
+
+  /**
+   * Whether the draggable should animate back to its origin after a valid drop.
+   * The droppable's `onDrop` callback still fires, but the item is not retained
+   * in the provider's dropped-items map.
+   *
+   * @default false
+   */
+  snapBackAfterDrop?: boolean;
 }
 
 /**
