@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect, useMemo } from "react";
 import {
   scrollTo,
   useAnimatedReaction,
@@ -9,7 +9,9 @@ import {
 import { listToObject, getContentWidth } from "../components/sortableUtils";
 import { HorizontalScrollDirection } from "../types/sortable";
 import { DropProviderRef } from "../types/context";
+import { scheduleOnUI } from "react-native-worklets";
 import {
+  SortablePositionSync,
   UseHorizontalSortableListOptions,
   UseHorizontalSortableListReturn,
 } from "../types/sortable";
@@ -142,6 +144,7 @@ export function useHorizontalSortableList<TData extends { id: string }>(
 
   // Runtime validation in development mode
   if (__DEV__) {
+    const seenIds = new Set<string>();
     data.forEach((item, index) => {
       const id = itemKeyExtractor(item, index);
       if (typeof id !== "string" || !id) {
@@ -149,17 +152,57 @@ export function useHorizontalSortableList<TData extends { id: string }>(
           `[react-native-reanimated-dnd] Item at index ${index} has invalid id: ${id}. ` +
             `Each item must have a unique string id property.`
         );
+      } else if (seenIds.has(id)) {
+        console.error(
+          `[react-native-reanimated-dnd] Duplicate item id "${id}" at index ${index}. ` +
+            `Each sortable item must have a unique id.`
+        );
       }
+      seenIds.add(id);
     });
   }
 
   // Set up shared values
-  const positions = useSharedValue(listToObject(data));
+  const positions = useSharedValue(listToObject(data, itemKeyExtractor));
+  const activeDragCount = useSharedValue(0);
+  const pendingPositions = useSharedValue<{ [id: string]: number } | null>(
+    null
+  );
+  const positionSync = useMemo<SortablePositionSync>(
+    () => ({ activeDragCount, pendingPositions }),
+    [activeDragCount, pendingPositions]
+  );
   const scrollX = useSharedValue(0);
   const nativeScrollX = useSharedValue(0);
   const autoScroll = useSharedValue(HorizontalScrollDirection.None);
   const scrollViewRef = useAnimatedRef();
   const dropProviderRef = useRef<DropProviderRef | null>(null);
+
+  const dataOrderKey = JSON.stringify(
+    data.map((item, index) => itemKeyExtractor(item, index))
+  );
+
+  useEffect(() => {
+    const nextPositions = listToObject(data, itemKeyExtractor);
+    scheduleOnUI(() => {
+      "worklet";
+      const currentPositions = positions.value;
+      const ids = Object.keys(nextPositions);
+      const isUnchanged =
+        ids.length === Object.keys(currentPositions).length &&
+        ids.every((id) => currentPositions[id] === nextPositions[id]);
+
+      if (isUnchanged) {
+        return;
+      }
+
+      if (activeDragCount.value > 0) {
+        pendingPositions.value = nextPositions;
+      } else {
+        positions.value = nextPositions;
+      }
+    });
+  }, [dataOrderKey]);
 
   // Scrolling synchronization
   useAnimatedReaction(
@@ -202,6 +245,7 @@ export function useHorizontalSortableList<TData extends { id: string }>(
       return {
         id,
         positions,
+        positionSync,
         leftBound: scrollX,
         autoScrollDirection: autoScroll,
         itemsCount: data.length,
@@ -217,6 +261,7 @@ export function useHorizontalSortableList<TData extends { id: string }>(
       paddingHorizontal,
       itemKeyExtractor,
       positions,
+      positionSync,
       scrollX,
       autoScroll,
     ]
@@ -224,6 +269,7 @@ export function useHorizontalSortableList<TData extends { id: string }>(
 
   return {
     positions,
+    positionSync,
     scrollX,
     autoScroll,
     scrollViewRef,

@@ -6,11 +6,9 @@ import {
   useAnimatedScrollHandler,
   useSharedValue,
 } from "react-native-reanimated";
-import {
-  listToObject,
-  resolveItemHeight,
-} from "../components/sortableUtils";
-import { ScrollDirection } from "../types/sortable";
+import { listToObject, resolveItemHeight } from "../components/sortableUtils";
+import { scheduleOnUI } from "react-native-worklets";
+import { ScrollDirection, SortablePositionSync } from "../types/sortable";
 import { DropProviderRef } from "../types/context";
 
 export interface UseSortableListOptions<TData> {
@@ -24,6 +22,7 @@ export interface UseSortableListOptions<TData> {
 
 export interface UseSortableListReturn<TData> {
   positions: any;
+  positionSync: SortablePositionSync;
   scrollY: any;
   autoScroll: any;
   scrollViewRef: any;
@@ -40,6 +39,7 @@ export interface UseSortableListReturn<TData> {
   ) => {
     id: string;
     positions: any;
+    positionSync: SortablePositionSync;
     lowerBound: any;
     autoScrollDirection: any;
     itemsCount: number;
@@ -97,6 +97,7 @@ export function useSortableList<TData extends { id: string }>(
 
   // Runtime validation in development mode
   if (__DEV__) {
+    const seenIds = new Set<string>();
     data.forEach((item, index) => {
       const id = itemKeyExtractor(item, index);
       if (typeof id !== "string" || !id) {
@@ -104,7 +105,13 @@ export function useSortableList<TData extends { id: string }>(
           `[react-native-reanimated-dnd] Item at index ${index} has invalid id: ${id}. ` +
             `Each item must have a unique string id property.`
         );
+      } else if (seenIds.has(id)) {
+        console.error(
+          `[react-native-reanimated-dnd] Duplicate item id "${id}" at index ${index}. ` +
+            `Each sortable item must have a unique id.`
+        );
       }
+      seenIds.add(id);
     });
 
     if (!isDynamicHeight && itemHeight === undefined) {
@@ -116,12 +123,50 @@ export function useSortableList<TData extends { id: string }>(
   }
 
   // Set up shared values
-  const positions = useSharedValue(listToObject(data));
+  const positions = useSharedValue(listToObject(data, itemKeyExtractor));
+  const activeDragCount = useSharedValue(0);
+  const pendingPositions = useSharedValue<{ [id: string]: number } | null>(
+    null
+  );
+  const positionSync = useMemo<SortablePositionSync>(
+    () => ({ activeDragCount, pendingPositions }),
+    [activeDragCount, pendingPositions]
+  );
   const scrollY = useSharedValue(0);
   const nativeScrollY = useSharedValue(0);
   const autoScroll = useSharedValue(ScrollDirection.None);
   const scrollViewRef = useAnimatedRef();
   const dropProviderRef = useRef<DropProviderRef | null>(null);
+
+  const dataOrderKey = JSON.stringify(
+    data.map((item, index) => itemKeyExtractor(item, index))
+  );
+
+  // Sync controlled order changes without remounting the native list. If a
+  // gesture is active, keep only the newest requested order and apply it when
+  // the last active drag finalizes so JS renders cannot overwrite UI-thread
+  // position updates mid-gesture.
+  useEffect(() => {
+    const nextPositions = listToObject(data, itemKeyExtractor);
+    scheduleOnUI(() => {
+      "worklet";
+      const currentPositions = positions.value;
+      const ids = Object.keys(nextPositions);
+      const isUnchanged =
+        ids.length === Object.keys(currentPositions).length &&
+        ids.every((id) => currentPositions[id] === nextPositions[id]);
+
+      if (isUnchanged) {
+        return;
+      }
+
+      if (activeDragCount.value > 0) {
+        pendingPositions.value = nextPositions;
+      } else {
+        positions.value = nextPositions;
+      }
+    });
+  }, [dataOrderKey]);
 
   // Dynamic height shared values — initialized with estimated heights
   // so items are positioned correctly from the first frame.
@@ -130,18 +175,26 @@ export function useSortableList<TData extends { id: string }>(
     const heights: { [id: string]: number } = {};
     data.forEach((item, index) => {
       const id = itemKeyExtractor(item, index);
-      heights[id] = resolveItemHeight(itemHeight, item, index, estimatedItemHeight);
+      heights[id] = resolveItemHeight(
+        itemHeight,
+        item,
+        index,
+        estimatedItemHeight
+      );
     });
     return heights;
   }, []);
 
-  const itemHeightsSV = useSharedValue<{ [id: string]: number }>(initialHeights);
+  const itemHeightsSV = useSharedValue<{ [id: string]: number }>(
+    initialHeights
+  );
 
   // Content height state — updated on JS thread for use in styles
   const fixedContentHeight =
     typeof itemHeight === "number" ? data.length * itemHeight : null;
   const [dynamicContentHeight, setDynamicContentHeight] = useState(() => {
-    if (!isDynamicHeight && fixedContentHeight !== null) return fixedContentHeight;
+    if (!isDynamicHeight && fixedContentHeight !== null)
+      return fixedContentHeight;
     // Estimate from data
     let total = 0;
     data.forEach((item, index) => {
@@ -182,7 +235,14 @@ export function useSortableList<TData extends { id: string }>(
       total += newHeights[id] ?? estimatedItemHeight;
     });
     setDynamicContentHeight(total);
-  }, [data, isDynamicHeight, needsMeasurement, itemHeight, estimatedItemHeight, itemKeyExtractor]);
+  }, [
+    data,
+    isDynamicHeight,
+    needsMeasurement,
+    itemHeight,
+    estimatedItemHeight,
+    itemKeyExtractor,
+  ]);
 
   // Height update function called from onLayout on JS thread
   const scheduleHeightUpdate = useCallback(
@@ -250,6 +310,7 @@ export function useSortableList<TData extends { id: string }>(
       return {
         id,
         positions,
+        positionSync,
         lowerBound: scrollY,
         autoScrollDirection: autoScroll,
         itemsCount: data.length,
@@ -257,7 +318,9 @@ export function useSortableList<TData extends { id: string }>(
         isDynamicHeight,
         estimatedItemHeight,
         itemHeights: isDynamicHeight ? itemHeightsSV : undefined,
-        scheduleHeightUpdate: needsMeasurement ? scheduleHeightUpdate : undefined,
+        scheduleHeightUpdate: needsMeasurement
+          ? scheduleHeightUpdate
+          : undefined,
       };
     },
     [
@@ -268,6 +331,7 @@ export function useSortableList<TData extends { id: string }>(
       needsMeasurement,
       itemKeyExtractor,
       positions,
+      positionSync,
       scrollY,
       autoScroll,
       itemHeightsSV,
@@ -277,6 +341,7 @@ export function useSortableList<TData extends { id: string }>(
 
   return {
     positions,
+    positionSync,
     scrollY,
     autoScroll,
     scrollViewRef,

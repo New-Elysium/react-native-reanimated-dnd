@@ -38,12 +38,15 @@ export function objectMove(
   return newObject;
 }
 
-export function listToObject<T extends { id: string }>(list: T[]) {
+export function listToObject<T extends { id: string }>(
+  list: T[],
+  itemKeyExtractor: (item: T, index: number) => string = (item) => item.id
+) {
   const values = Object.values(list);
   const object: { [id: string]: number } = {};
 
   for (let i = 0; i < values.length; i++) {
-    object[values[i].id] = i;
+    object[itemKeyExtractor(values[i], i)] = i;
   }
 
   return object;
@@ -295,17 +298,27 @@ export function getItemCumulativeY(
 }
 
 /**
- * Returns a hash code based on the data
- * @param  {any[]} data The data to hash.
- * @return {string}    A 32bit integer
+ * Returns a collision-safe React key based on which items are in the list.
+ *
+ * Sortable wraps SortableComponent with `key={dataHash(data)}` to force a
+ * remount whenever the key changes. We key on item membership (the sorted
+ * list of ids), not on item order, so reorders do not trigger a
+ * remount. Reorders are handled by syncing the `positions` shared value in
+ * useSortableList. The visual reorder still happens, but without unmounting
+ * the FlatList and resetting its scroll position to 0.
+ *
+ * Add / remove still changes the key and still
+ * triggers the remount, which is correct: those need positions to be
+ * reinitialized from the new data with the new item count.
+ *
+ * @param data The data to identify.
+ * @param itemKeyExtractor Optional key extractor used by Sortable.
+ * @returns A serialized, order-independent item membership key.
  */
-export const dataHash = (data: any[]): string => {
-  const str = data.reduce((acc, item) => acc + item.id, "");
-  let hash = 0;
-  for (let i = 0, len = str.length; i < len; i++) {
-    let chr = str.charCodeAt(i);
-    hash = (hash << 5) - hash + chr;
-    hash |= 0; // Convert to 32bit integer
-  }
-  return hash.toString();
+export const dataHash = <T extends { id: string }>(
+  data: T[],
+  itemKeyExtractor: (item: T, index: number) => string = (item) => item.id
+): string => {
+  const ids = data.map(itemKeyExtractor).sort();
+  return JSON.stringify(ids);
 };

@@ -1,4 +1,9 @@
-import React, { createContext, useCallback, useContext, useEffect } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+} from "react";
 import { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native";
 import Animated from "react-native-reanimated";
 import { GestureDetector } from "react-native-gesture-handler";
@@ -9,9 +14,14 @@ import {
   SortableContextValue,
   SortableHandleProps,
   SortableItemProps,
+  SortablePositionSync,
   UseHorizontalSortableOptions,
   UseSortableOptions,
 } from "../types/sortable";
+
+export const SortableListContext = createContext<SortablePositionSync | null>(
+  null
+);
 
 // Create a context to share gesture between SortableItem and SortableHandle
 const SortableContext = createContext<SortableContextValue | null>(null);
@@ -53,11 +63,16 @@ function renderSortableContent(
   panGestureHandler: SortableContextValue["panGestureHandler"],
   handlePanGestureHandler: SortableContextValue["panGestureHandler"],
   registerHandle: SortableContextValue["registerHandle"],
-  onLayout?: (event: LayoutChangeEvent) => void,
+  onLayout?: (event: LayoutChangeEvent) => void
 ) {
   const content = (
-    <Animated.View style={[animatedStyle, customAnimatedStyle]} onLayout={onLayout}>
-      <SortableContext.Provider value={{ panGestureHandler: handlePanGestureHandler, registerHandle }}>
+    <Animated.View
+      style={[animatedStyle, customAnimatedStyle]}
+      onLayout={onLayout}
+    >
+      <SortableContext.Provider
+        value={{ panGestureHandler: handlePanGestureHandler, registerHandle }}
+      >
         <Animated.View style={style}>{children}</Animated.View>
       </SortableContext.Provider>
     </Animated.View>
@@ -79,6 +94,7 @@ interface VerticalSortableItemInnerProps<T> extends SortableItemProps<T> {
 function VerticalSortableItemInner<T>({
   id,
   positions,
+  positionSync,
   lowerBound,
   autoScrollDirection,
   itemsCount,
@@ -97,9 +113,15 @@ function VerticalSortableItemInner<T>({
   onDragging,
   preDragDelay,
 }: VerticalSortableItemInnerProps<T>) {
-  const { animatedStyle, panGestureHandler, handlePanGestureHandler, registerHandle } = useSortable<T>({
+  const {
+    animatedStyle,
+    panGestureHandler,
+    handlePanGestureHandler,
+    registerHandle,
+  } = useSortable<T>({
     id,
     positions,
+    positionSync,
     lowerBound,
     autoScrollDirection,
     itemsCount,
@@ -133,7 +155,7 @@ function VerticalSortableItemInner<T>({
     panGestureHandler,
     handlePanGestureHandler,
     registerHandle,
-    isDynamicHeight && scheduleHeightUpdate ? handleLayout : undefined,
+    isDynamicHeight && scheduleHeightUpdate ? handleLayout : undefined
   );
 }
 
@@ -148,6 +170,7 @@ interface HorizontalSortableItemInnerProps<T> extends SortableItemProps<T> {
 function HorizontalSortableItemInner<T>({
   id,
   positions,
+  positionSync,
   leftBound,
   autoScrollHorizontalDirection,
   itemsCount,
@@ -164,23 +187,28 @@ function HorizontalSortableItemInner<T>({
   onDraggingHorizontal,
   preDragDelay,
 }: HorizontalSortableItemInnerProps<T>) {
-  const { animatedStyle, panGestureHandler, handlePanGestureHandler, registerHandle } =
-    useHorizontalSortable<T>({
-      id,
-      positions,
-      leftBound,
-      autoScrollDirection: autoScrollHorizontalDirection,
-      itemsCount,
-      itemWidth,
-      gap,
-      paddingHorizontal,
-      containerWidth,
-      onMove,
-      onDragStart,
-      onDrop,
-      onDragging: onDraggingHorizontal,
-      preDragDelay,
-    });
+  const {
+    animatedStyle,
+    panGestureHandler,
+    handlePanGestureHandler,
+    registerHandle,
+  } = useHorizontalSortable<T>({
+    id,
+    positions,
+    positionSync,
+    leftBound,
+    autoScrollDirection: autoScrollHorizontalDirection,
+    itemsCount,
+    itemWidth,
+    gap,
+    paddingHorizontal,
+    containerWidth,
+    onMove,
+    onDragStart,
+    onDrop,
+    onDragging: onDraggingHorizontal,
+    preDragDelay,
+  });
 
   return renderSortableContent(
     animatedStyle,
@@ -189,7 +217,7 @@ function HorizontalSortableItemInner<T>({
     children,
     panGestureHandler,
     handlePanGestureHandler,
-    registerHandle,
+    registerHandle
   );
 }
 
@@ -210,6 +238,12 @@ export function SortableItem<T>({
   direction = SortableDirection.Vertical,
   ...props
 }: SortableItemProps<T>) {
+  const contextPositionSync = useContext(SortableListContext);
+  const resolvedProps = {
+    ...props,
+    positionSync: props.positionSync ?? contextPositionSync ?? undefined,
+  };
+
   // Validate required props based on direction
   if (
     direction === SortableDirection.Vertical &&
@@ -235,7 +269,7 @@ export function SortableItem<T>({
   if (direction === SortableDirection.Horizontal) {
     return (
       <HorizontalSortableItemInner
-        {...props}
+        {...resolvedProps}
         direction={direction}
         itemWidth={props.itemWidth!}
         leftBound={props.leftBound!}
@@ -246,7 +280,7 @@ export function SortableItem<T>({
 
   return (
     <VerticalSortableItemInner
-      {...props}
+      {...resolvedProps}
       direction={direction}
       lowerBound={props.lowerBound!}
       autoScrollDirection={props.autoScrollDirection!}

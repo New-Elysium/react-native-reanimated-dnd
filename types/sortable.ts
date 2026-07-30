@@ -41,6 +41,17 @@ export enum SortableDirection {
 }
 
 /**
+ * Internal coordination shared by a sortable list and its item gestures.
+ * It prevents controlled data updates from replacing positions mid-drag.
+ *
+ * @internal
+ */
+export interface SortablePositionSync {
+  activeDragCount: SharedValue<number>;
+  pendingPositions: SharedValue<{ [id: string]: number } | null>;
+}
+
+/**
  * Configuration options for the useSortable hook.
  *
  * @template T - The type of data associated with the sortable item
@@ -72,6 +83,9 @@ export interface UseSortableOptions<T> {
    * ```
    */
   positions: SharedValue<{ [id: string]: number }>;
+
+  /** @internal List-owned synchronization state. */
+  positionSync?: SortablePositionSync;
 
   /**
    * Shared value representing the current scroll position (lower bound) of the container.
@@ -386,6 +400,9 @@ export interface UseSortableListReturn<TData extends SortableData> {
    */
   positions: any;
 
+  /** Internal drag-safe position synchronization */
+  positionSync: SortablePositionSync;
+
   /**
    * Shared value tracking the current scroll position.
    * Used for auto-scrolling during drag operations.
@@ -465,6 +482,8 @@ export interface UseSortableListReturn<TData extends SortableData> {
     id: string;
     /** Shared positions object */
     positions: any;
+    /** Internal drag-safe position synchronization */
+    positionSync: SortablePositionSync;
     /** Shared scroll position */
     lowerBound: any;
     /** Shared auto-scroll direction */
@@ -503,6 +522,9 @@ export interface SortableItemProps<T> {
 
   /** Shared value containing positions of all items in the list */
   positions: SharedValue<{ [id: string]: number }>;
+
+  /** @internal List-owned synchronization state. */
+  positionSync?: SortablePositionSync;
 
   /** Shared value representing the current scroll position (for vertical) */
   lowerBound?: SharedValue<number>;
@@ -678,6 +700,9 @@ export interface SortableRenderItemProps<TData extends SortableData> {
   /** Shared value containing positions of all items */
   positions: SharedValue<{ [id: string]: number }>;
 
+  /** @internal List-owned synchronization state. */
+  positionSync?: SortablePositionSync;
+
   /** Direction of the sortable list */
   direction?: SortableDirection;
 
@@ -753,6 +778,9 @@ export interface UseHorizontalSortableOptions<T> {
    * This is typically managed by the parent sortable list component.
    */
   positions: SharedValue<{ [id: string]: number }>;
+
+  /** @internal List-owned synchronization state. */
+  positionSync?: SortablePositionSync;
 
   /**
    * Shared value representing the current scroll position (left bound) of the container.
@@ -925,6 +953,9 @@ export interface UseHorizontalSortableListReturn<TData extends SortableData> {
    */
   positions: any;
 
+  /** Internal drag-safe position synchronization */
+  positionSync: SortablePositionSync;
+
   /**
    * Shared value tracking the current horizontal scroll position.
    */
@@ -969,6 +1000,7 @@ export interface UseHorizontalSortableListReturn<TData extends SortableData> {
   ) => {
     id: string;
     positions: any;
+    positionSync: SortablePositionSync;
     leftBound: any;
     autoScrollDirection: any;
     itemsCount: number;
@@ -992,6 +1024,9 @@ export interface HorizontalSortableItemProps<T> {
 
   /** Shared value containing positions of all items in the list */
   positions: SharedValue<{ [id: string]: number }>;
+
+  /** @internal List-owned synchronization state. */
+  positionSync?: SortablePositionSync;
 
   /** Shared value representing the current scroll position */
   leftBound: SharedValue<number>;
@@ -1104,6 +1139,9 @@ export interface HorizontalSortableRenderItemProps<TData extends SortableData> {
 
   /** Shared value containing positions of all items */
   positions: SharedValue<{ [id: string]: number }>;
+
+  /** @internal List-owned synchronization state. */
+  positionSync?: SortablePositionSync;
 
   /** Shared value representing the current scroll position */
   leftBound: SharedValue<number>;

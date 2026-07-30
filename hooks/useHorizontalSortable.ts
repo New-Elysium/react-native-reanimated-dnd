@@ -141,6 +141,7 @@ export function useHorizontalSortable<T>(
   const {
     id,
     positions,
+    positionSync,
     leftBound,
     autoScrollDirection,
     itemsCount,
@@ -168,7 +169,7 @@ export function useHorizontalSortable<T>(
 
   const initialLeftVal = useMemo(() => {
     const posArr = positions.get();
-    const pos = posArr?.[id];
+    const pos = posArr?.[id] ?? 0;
     return getItemXPosition(pos, itemWidth, gap, paddingHorizontal);
   }, []);
 
@@ -363,6 +364,9 @@ export function useHorizontalSortable<T>(
 
         positionX.value = initialItemContentX.value;
         movingSV.value = true;
+        if (positionSync) {
+          positionSync.activeDragCount.value += 1;
+        }
         scheduleOnRN(setIsMoving, true);
 
         if (onDragStart) {
@@ -378,6 +382,10 @@ export function useHorizontalSortable<T>(
       })
       .onFinalize(() => {
         "worklet";
+        if (!movingSV.value) {
+          return;
+        }
+
         const finishPosition = getItemXPosition(
           positions.value[id],
           itemWidth,
@@ -391,6 +399,20 @@ export function useHorizontalSortable<T>(
         if (onDrop) {
           const positionsCopy = { ...positions.value };
           scheduleOnRN(onDrop, id, positions.value[id], positionsCopy);
+        }
+
+        if (positionSync) {
+          positionSync.activeDragCount.value = Math.max(
+            0,
+            positionSync.activeDragCount.value - 1
+          );
+          if (
+            positionSync.activeDragCount.value === 0 &&
+            positionSync.pendingPositions.value
+          ) {
+            positions.value = positionSync.pendingPositions.value;
+            positionSync.pendingPositions.value = null;
+          }
         }
 
         currentOverItemId.value = null;

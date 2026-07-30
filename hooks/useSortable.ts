@@ -15,6 +15,7 @@ import {
   findPositionForY,
   getItemCumulativeY,
 } from "../components/sortableUtils";
+import type { SortablePositionSync } from "../types/sortable";
 
 export enum ScrollDirection {
   None = "none",
@@ -117,6 +118,7 @@ export function setAutoScroll(
 export interface UseSortableOptions<T> {
   id: string;
   positions: SharedValue<{ [id: string]: number }>;
+  positionSync?: SortablePositionSync;
   lowerBound: SharedValue<number>;
   autoScrollDirection: SharedValue<ScrollDirection>;
   itemsCount: number;
@@ -177,6 +179,7 @@ export function useSortable<T>(
   const {
     id,
     positions,
+    positionSync,
     lowerBound,
     autoScrollDirection,
     itemsCount,
@@ -243,7 +246,12 @@ export function useSortable<T>(
       if (isDynamicHeight && itemHeights) {
         // Compute Y position inline — avoids an intermediate shared value
         // that would cause all items to cascade on every position change.
-        return getItemCumulativeY(id, positions.value, itemHeights.value, estimatedItemHeight);
+        return getItemCumulativeY(
+          id,
+          positions.value,
+          itemHeights.value,
+          estimatedItemHeight
+        );
       }
       return (positions.value[id] ?? 0) * effectiveItemHeight;
     },
@@ -252,7 +260,15 @@ export function useSortable<T>(
         top.value = withSpring(newTop);
       }
     },
-    [isDynamicHeight, itemHeights, positions, id, effectiveItemHeight, estimatedItemHeight, movingSV]
+    [
+      isDynamicHeight,
+      itemHeights,
+      positions,
+      id,
+      effectiveItemHeight,
+      estimatedItemHeight,
+      movingSV,
+    ]
   );
 
   // === Position change callback (onMove) ===
@@ -411,7 +427,14 @@ export function useSortable<T>(
         }
       }
     },
-    [isDynamicHeight, itemHeights, effectiveItemHeight, estimatedItemHeight, itemsCount, calculatedContainerHeight]
+    [
+      isDynamicHeight,
+      itemHeights,
+      effectiveItemHeight,
+      estimatedItemHeight,
+      itemsCount,
+      calculatedContainerHeight,
+    ]
   );
 
   useAnimatedReaction(
@@ -454,6 +477,9 @@ export function useSortable<T>(
 
         positionY.value = initialItemContentY.value;
         movingSV.value = true;
+        if (positionSync) {
+          positionSync.activeDragCount.value += 1;
+        }
         scheduleOnRN(setIsMoving, true);
 
         if (onDragStart) {
@@ -463,12 +489,17 @@ export function useSortable<T>(
       .onUpdate((event) => {
         "worklet";
         const fingerDyScreen = event.absoluteY - initialFingerAbsoluteY.value;
-        const scrollDeltaSinceStart = lowerBound.value - initialLowerBound.value;
+        const scrollDeltaSinceStart =
+          lowerBound.value - initialLowerBound.value;
         positionY.value =
           initialItemContentY.value + fingerDyScreen + scrollDeltaSinceStart;
       })
       .onFinalize(() => {
         "worklet";
+        if (!movingSV.value) {
+          return;
+        }
+
         // Calculate finish position
         let finishPosition: number;
         if (isDynamicHeight && itemHeights) {
@@ -489,6 +520,20 @@ export function useSortable<T>(
         if (onDrop) {
           const positionsCopy = { ...positions.value };
           scheduleOnRN(onDrop, id, positions.value[id], positionsCopy);
+        }
+
+        if (positionSync) {
+          positionSync.activeDragCount.value = Math.max(
+            0,
+            positionSync.activeDragCount.value - 1
+          );
+          if (
+            positionSync.activeDragCount.value === 0 &&
+            positionSync.pendingPositions.value
+          ) {
+            positions.value = positionSync.pendingPositions.value;
+            positionSync.pendingPositions.value = null;
+          }
         }
 
         currentOverItemId.value = null;
