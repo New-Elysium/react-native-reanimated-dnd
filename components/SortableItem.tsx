@@ -19,9 +19,14 @@ import {
   UseSortableOptions,
 } from "../types/sortable";
 
-export const SortableListContext = createContext<SortablePositionSync | null>(
-  null
-);
+export interface SortableListContextValue {
+  positionSync: SortablePositionSync;
+  showDropIndicator?: boolean;
+  dropIndicatorStyle?: StyleProp<ViewStyle>;
+}
+
+export const SortableListContext =
+  createContext<SortableListContextValue | null>(null);
 
 // Create a context to share gesture between SortableItem and SortableHandle
 const SortableContext = createContext<SortableContextValue | null>(null);
@@ -57,8 +62,11 @@ const SortableHandle = ({ children, style }: SortableHandleProps) => {
 
 function renderSortableContent(
   animatedStyle: StyleProp<ViewStyle>,
+  dropIndicatorAnimatedStyle: StyleProp<ViewStyle>,
   customAnimatedStyle: SortableItemProps<unknown>["animatedStyle"],
   style: StyleProp<ViewStyle> | undefined,
+  showDropIndicator: boolean | undefined,
+  dropIndicatorStyle: StyleProp<ViewStyle> | undefined,
   children: React.ReactNode,
   panGestureHandler: SortableContextValue["panGestureHandler"],
   handlePanGestureHandler: SortableContextValue["panGestureHandler"],
@@ -70,6 +78,16 @@ function renderSortableContent(
       style={[animatedStyle, customAnimatedStyle]}
       onLayout={onLayout}
     >
+      {showDropIndicator && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            dropIndicatorAnimatedStyle,
+            styles.dropIndicator,
+            dropIndicatorStyle,
+          ]}
+        />
+      )}
       <SortableContext.Provider
         value={{ panGestureHandler: handlePanGestureHandler, registerHandle }}
       >
@@ -108,6 +126,8 @@ function VerticalSortableItemInner<T>({
   children,
   style,
   animatedStyle: customAnimatedStyle,
+  showDropIndicator,
+  dropIndicatorStyle,
   onMove,
   onDragStart,
   onDrop,
@@ -116,6 +136,7 @@ function VerticalSortableItemInner<T>({
 }: VerticalSortableItemInnerProps<T>) {
   const {
     animatedStyle,
+    dropIndicatorAnimatedStyle,
     panGestureHandler,
     handlePanGestureHandler,
     registerHandle,
@@ -151,8 +172,11 @@ function VerticalSortableItemInner<T>({
 
   return renderSortableContent(
     animatedStyle,
+    dropIndicatorAnimatedStyle,
     customAnimatedStyle,
     style,
+    showDropIndicator,
+    dropIndicatorStyle,
     children,
     panGestureHandler,
     handlePanGestureHandler,
@@ -184,6 +208,8 @@ function HorizontalSortableItemInner<T>({
   children,
   style,
   animatedStyle: customAnimatedStyle,
+  showDropIndicator,
+  dropIndicatorStyle,
   onMove,
   onDragStart,
   onDrop,
@@ -192,6 +218,7 @@ function HorizontalSortableItemInner<T>({
 }: HorizontalSortableItemInnerProps<T>) {
   const {
     animatedStyle,
+    dropIndicatorAnimatedStyle,
     panGestureHandler,
     handlePanGestureHandler,
     registerHandle,
@@ -216,8 +243,11 @@ function HorizontalSortableItemInner<T>({
 
   return renderSortableContent(
     animatedStyle,
+    dropIndicatorAnimatedStyle,
     customAnimatedStyle,
     style,
+    showDropIndicator,
+    dropIndicatorStyle,
     children,
     panGestureHandler,
     handlePanGestureHandler,
@@ -242,10 +272,14 @@ export function SortableItem<T>({
   direction = SortableDirection.Vertical,
   ...props
 }: SortableItemProps<T>) {
-  const contextPositionSync = useContext(SortableListContext);
+  const listContext = useContext(SortableListContext);
   const resolvedProps = {
     ...props,
-    positionSync: props.positionSync ?? contextPositionSync ?? undefined,
+    positionSync: props.positionSync ?? listContext?.positionSync,
+    showDropIndicator:
+      props.showDropIndicator ?? listContext?.showDropIndicator ?? false,
+    dropIndicatorStyle:
+      props.dropIndicatorStyle ?? listContext?.dropIndicatorStyle,
   };
 
   // Validate required props based on direction
@@ -294,3 +328,10 @@ export function SortableItem<T>({
 
 // Attach the SortableHandle as a static property
 SortableItem.Handle = SortableHandle;
+
+const styles = {
+  dropIndicator: {
+    backgroundColor: "#3B82F6",
+    borderRadius: 999,
+  } satisfies ViewStyle,
+};

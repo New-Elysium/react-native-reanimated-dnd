@@ -444,8 +444,29 @@ export function useHorizontalSortable<T>(
     };
   }, [movingSV, itemWidth]);
 
+  const dropIndicatorAnimatedStyle = useAnimatedStyle(() => {
+    "worklet";
+    const targetLeft = getItemXPosition(
+      positions.value[id] ?? 0,
+      itemWidth,
+      gap,
+      paddingHorizontal
+    );
+
+    return {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      left: targetLeft - left.value - 1.5,
+      width: 3,
+      opacity: movingSV.value ? 1 : 0,
+      zIndex: 2,
+    };
+  }, [gap, id, itemWidth, left, movingSV, paddingHorizontal, positions]);
+
   return {
     animatedStyle,
+    dropIndicatorAnimatedStyle,
     panGestureHandler,
     handlePanGestureHandler,
     isMoving,

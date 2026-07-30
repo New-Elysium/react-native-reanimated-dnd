@@ -44,13 +44,14 @@ function useHorizontalSortable<T>(
 
 ### UseHorizontalSortableReturn
 
-| Property            | Type                            | Description                                  |
-| ------------------- | ------------------------------- | -------------------------------------------- |
-| `animatedStyle`     | `StyleProp<ViewStyle>`          | Animated style for the sortable item         |
-| `panGestureHandler` | `GestureType`                   | Pan gesture to pass to GestureDetector       |
-| `registerHandle`    | `(registered: boolean) => void` | Callback for handle registration             |
-| `isMoving`          | `boolean`                       | Whether the item is currently being dragged  |
-| `hasHandle`         | `boolean`                       | Whether the item has a drag handle component |
+| Property                     | Type                            | Description                                    |
+| ---------------------------- | ------------------------------- | ---------------------------------------------- |
+| `animatedStyle`              | `StyleProp<ViewStyle>`          | Animated style for the sortable item           |
+| `dropIndicatorAnimatedStyle` | `StyleProp<ViewStyle>`          | Animated style for a horizontal insertion line |
+| `panGestureHandler`          | `GestureType`                   | Pan gesture to pass to GestureDetector         |
+| `registerHandle`             | `(registered: boolean) => void` | Callback for handle registration               |
+| `isMoving`                   | `boolean`                       | Whether the item is currently being dragged    |
+| `hasHandle`                  | `boolean`                       | Whether the item has a drag handle component   |
 
 ## Related Types
 

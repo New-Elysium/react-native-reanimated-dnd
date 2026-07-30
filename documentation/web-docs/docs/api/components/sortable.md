@@ -93,6 +93,28 @@ const renderTask = ({ item, id, positions, ...props }) => (
 - **Default**: `undefined`
 - **Description**: Additional native `ScrollView` props when `useFlatList={false}`, including a custom `refreshControl`.
 
+#### showDropIndicator
+
+- **Type**: `boolean`
+- **Default**: `false`
+- **Description**: Show a live insertion line at the current target position while an item is dragged. Works for vertical and horizontal lists.
+
+```tsx
+<Sortable
+  data={items}
+  itemHeight={64}
+  renderItem={renderItem}
+  showDropIndicator
+  dropIndicatorStyle={{ backgroundColor: "#22c55e", height: 4 }}
+/>
+```
+
+#### dropIndicatorStyle
+
+- **Type**: `StyleProp<ViewStyle>`
+- **Default**: A 3px blue rounded line
+- **Description**: Customize the insertion indicator rendered when `showDropIndicator` is enabled.
+
 #### style
 
 - **Type**: `StyleProp<ViewStyle>`

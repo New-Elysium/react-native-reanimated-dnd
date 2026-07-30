@@ -141,6 +141,11 @@ return (
 );
 ```
 
+#### dropIndicatorAnimatedStyle
+
+- **Type**: `StyleProp<ViewStyle>`
+- **Description**: Animated absolute-positioning style for a vertical insertion indicator. Apply it to your own indicator view when building directly with the hook.
+
 #### panGestureHandler
 
 - **Type**: `GestureType`

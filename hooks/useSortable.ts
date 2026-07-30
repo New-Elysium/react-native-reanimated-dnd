@@ -151,6 +151,7 @@ export interface UseSortableOptions<T> {
 
 export interface UseSortableReturn {
   animatedStyle: StyleProp<ViewStyle>;
+  dropIndicatorAnimatedStyle: StyleProp<ViewStyle>;
   panGestureHandler: GestureType;
   handlePanGestureHandler: GestureType;
   isMoving: boolean;
@@ -565,8 +566,43 @@ export function useSortable<T>(
     };
   }, [movingSV]);
 
+  const dropIndicatorAnimatedStyle = useAnimatedStyle(() => {
+    "worklet";
+    let targetTop: number;
+    if (isDynamicHeight && itemHeights) {
+      targetTop = getItemCumulativeY(
+        id,
+        positions.value,
+        itemHeights.value,
+        estimatedItemHeight
+      );
+    } else {
+      targetTop = (positions.value[id] ?? 0) * effectiveItemHeight;
+    }
+
+    return {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      top: targetTop - top.value - 1.5,
+      height: 3,
+      opacity: movingSV.value ? 1 : 0,
+      zIndex: 2,
+    };
+  }, [
+    effectiveItemHeight,
+    estimatedItemHeight,
+    id,
+    isDynamicHeight,
+    itemHeights,
+    movingSV,
+    positions,
+    top,
+  ]);
+
   return {
     animatedStyle,
+    dropIndicatorAnimatedStyle,
     panGestureHandler,
     handlePanGestureHandler,
     isMoving,

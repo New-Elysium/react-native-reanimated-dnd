@@ -303,6 +303,9 @@ export interface UseSortableReturn {
    */
   animatedStyle: StyleProp<ViewStyle>;
 
+  /** Animated positioning style for an insertion indicator. */
+  dropIndicatorAnimatedStyle: StyleProp<ViewStyle>;
+
   /**
    * Pan gesture for full-item drag interactions.
    * Automatically disabled when a handle is registered.
@@ -633,6 +636,12 @@ export interface SortableItemProps<T> {
   /** Additional animated style to apply */
   animatedStyle?: StyleProp<ViewStyle>;
 
+  /** Whether to render a live insertion indicator while this item is dragged. */
+  showDropIndicator?: boolean;
+
+  /** Custom visual style for the insertion indicator. */
+  dropIndicatorStyle?: StyleProp<ViewStyle>;
+
   /** Callback fired when item position changes */
   onMove?: (id: string, from: number, to: number) => void;
 
@@ -739,6 +748,12 @@ export interface SortableProps<TData extends SortableData> {
    * This can include a custom `refreshControl`.
    */
   scrollViewProps?: SortableScrollViewProps;
+
+  /** Show an insertion line at the current target position while dragging. */
+  showDropIndicator?: boolean;
+
+  /** Custom style for the insertion line. */
+  dropIndicatorStyle?: StyleProp<ViewStyle>;
 }
 
 /**
@@ -941,6 +956,9 @@ export interface UseHorizontalSortableReturn {
    * Contains position transforms and visual effects for dragging state.
    */
   animatedStyle: StyleProp<ViewStyle>;
+
+  /** Animated positioning style for an insertion indicator. */
+  dropIndicatorAnimatedStyle: StyleProp<ViewStyle>;
 
   /**
    * Pan gesture for full-item drag interactions.

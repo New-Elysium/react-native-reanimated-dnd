@@ -108,6 +108,18 @@ import { SortableItem } from "react-native-reanimated-dnd";
 - **Required**: No
 - **Description**: Custom animated styles applied to the item.
 
+#### showDropIndicator
+
+- **Type**: `boolean`
+- **Default**: Inherited from the parent `Sortable`
+- **Description**: Render an insertion line at this item's current target position while it is dragged.
+
+#### dropIndicatorStyle
+
+- **Type**: `StyleProp<ViewStyle>`
+- **Default**: Inherited from the parent `Sortable`
+- **Description**: Customize the insertion line. Direct item props override the parent configuration.
+
 ### Callback Props
 
 #### onMove

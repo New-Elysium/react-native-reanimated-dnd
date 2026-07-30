@@ -55,6 +55,8 @@ function SortableComponent<TData extends { id: string }>({
   useFlatList = true,
   flatListProps,
   scrollViewProps,
+  showDropIndicator,
+  dropIndicatorStyle,
 }: SortableProps<TData>) {
   // Determine if dynamic height mode applies
   const isDynamicHeightMode = useMemo(() => {
@@ -94,6 +96,8 @@ function SortableComponent<TData extends { id: string }>({
         useFlatList={useFlatList}
         flatListProps={flatListProps}
         scrollViewProps={scrollViewProps}
+        showDropIndicator={showDropIndicator}
+        dropIndicatorStyle={dropIndicatorStyle}
       />
     );
   }
@@ -113,6 +117,8 @@ function SortableComponent<TData extends { id: string }>({
       useFlatList={useFlatList}
       flatListProps={flatListProps}
       scrollViewProps={scrollViewProps}
+      showDropIndicator={showDropIndicator}
+      dropIndicatorStyle={dropIndicatorStyle}
     />
   );
 }
@@ -131,6 +137,8 @@ function VerticalSortableContent<TData extends { id: string }>({
   useFlatList,
   flatListProps,
   scrollViewProps,
+  showDropIndicator,
+  dropIndicatorStyle,
 }: SortableProps<TData>) {
   const {
     positionSync,
@@ -163,10 +171,15 @@ function VerticalSortableContent<TData extends { id: string }>({
     [getItemProps, renderItem]
   );
 
+  const sortableListContextValue = useMemo(
+    () => ({ positionSync, showDropIndicator, dropIndicatorStyle }),
+    [positionSync, showDropIndicator, dropIndicatorStyle]
+  );
+
   return (
     <GestureHandlerRootView style={styles.flex}>
       <DropProvider ref={dropProviderRef}>
-        <SortableListContext.Provider value={positionSync}>
+        <SortableListContext.Provider value={sortableListContextValue}>
           {useFlatList ? (
             <AnimatedFlatList
               {...flatListProps}
@@ -232,6 +245,8 @@ function HorizontalSortableContent<TData extends { id: string }>({
   useFlatList,
   flatListProps,
   scrollViewProps,
+  showDropIndicator,
+  dropIndicatorStyle,
 }: SortableProps<TData>) {
   const {
     positionSync,
@@ -264,10 +279,15 @@ function HorizontalSortableContent<TData extends { id: string }>({
     [getItemProps, renderItem]
   );
 
+  const sortableListContextValue = useMemo(
+    () => ({ positionSync, showDropIndicator, dropIndicatorStyle }),
+    [positionSync, showDropIndicator, dropIndicatorStyle]
+  );
+
   return (
     <GestureHandlerRootView style={styles.flex}>
       <DropProvider ref={dropProviderRef}>
-        <SortableListContext.Provider value={positionSync}>
+        <SortableListContext.Provider value={sortableListContextValue}>
           {useFlatList ? (
             <AnimatedFlatList
               {...flatListProps}
