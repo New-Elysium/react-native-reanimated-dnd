@@ -5,6 +5,7 @@ import Animated, {
   SharedValue,
   useAnimatedStyle,
   useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import { DropProvider } from "../context/DropContext";
 import type { DropProviderRef, DraggingPayload } from "../types/context";
@@ -32,6 +33,11 @@ interface SortableBoardCardProps<TItem extends SortableBoardItem> {
   itemGap: number;
   activationDelay: number;
   activeItemId: SharedValue<string>;
+  activeSourceColumnId: SharedValue<string>;
+  activeSourceIndex: SharedValue<number>;
+  previewColumnId: SharedValue<string>;
+  previewIndex: SharedValue<number>;
+  activeSlotHeight: SharedValue<number>;
   itemContainerStyle: SortableBoardProps<
     TItem,
     SortableBoardColumn<TItem>
@@ -58,6 +64,11 @@ function SortableBoardCard<TItem extends SortableBoardItem>({
   itemGap,
   activationDelay,
   activeItemId,
+  activeSourceColumnId,
+  activeSourceIndex,
+  previewColumnId,
+  previewIndex,
+  activeSlotHeight,
   itemContainerStyle,
   activeDropStyle,
   renderItem,
@@ -84,35 +95,100 @@ function SortableBoardCard<TItem extends SortableBoardItem>({
       elevation: isActive ? 1000 : 0,
     };
   }, [activeItemId, item.id]);
+  const positionAnimatedStyle = useAnimatedStyle(() => {
+    "worklet";
+    let translateY = 0;
+
+    if (activeItemId.value !== "") {
+      const sourceColumnId = activeSourceColumnId.value;
+      const sourceIndex = activeSourceIndex.value;
+      const targetColumnId = previewColumnId.value;
+      const targetIndex = previewIndex.value;
+      const slotHeight = activeSlotHeight.value;
+
+      if (columnId === sourceColumnId && columnId === targetColumnId) {
+        if (
+          targetIndex > sourceIndex &&
+          itemIndex > sourceIndex &&
+          itemIndex < targetIndex
+        ) {
+          translateY = -slotHeight;
+        } else if (
+          targetIndex < sourceIndex &&
+          itemIndex >= targetIndex &&
+          itemIndex < sourceIndex
+        ) {
+          translateY = slotHeight;
+        }
+      } else if (columnId === sourceColumnId && itemIndex > sourceIndex) {
+        translateY = -slotHeight;
+      } else if (columnId === targetColumnId && itemIndex >= targetIndex) {
+        translateY = slotHeight;
+      }
+    }
+
+    return {
+      transform: [
+        {
+          translateY: withTiming(translateY, {
+            duration: 140,
+          }),
+        },
+      ],
+    };
+  }, [
+    activeItemId,
+    activeSlotHeight,
+    activeSourceColumnId,
+    activeSourceIndex,
+    columnId,
+    itemIndex,
+    previewColumnId,
+    previewIndex,
+  ]);
+  const handleActiveChange = useCallback(
+    (isActive: boolean) => {
+      if (!isActive) {
+        return;
+      }
+
+      previewColumnId.value = columnId;
+      previewIndex.value = itemIndex;
+    },
+    [columnId, itemIndex, previewColumnId, previewIndex]
+  );
 
   return (
-    <Droppable<BoardDragData<TItem>>
-      droppableId={`board-item-${columnId}-${item.id}`}
-      dropPriority={10}
-      capacity={Infinity}
-      onDrop={(droppedData) => moveItem(droppedData, columnId, item.id)}
-      activeStyle={activeDropStyle}
-      style={[{ marginBottom: itemGap }, itemContainerStyle]}
-    >
-      <Draggable<BoardDragData<TItem>>
-        data={dragData}
-        draggableId={`board-draggable-${item.id}`}
-        preDragDelay={activationDelay}
-        collisionAlgorithm="center"
-        snapBackAfterDrop
-        style={sourceAnimatedStyle}
+    <Animated.View style={positionAnimatedStyle}>
+      <Droppable<BoardDragData<TItem>>
+        droppableId={`board-item-${columnId}-${item.id}`}
+        dropPriority={10}
+        capacity={Infinity}
+        onDrop={(droppedData) => moveItem(droppedData, columnId, item.id)}
+        onActiveChange={handleActiveChange}
+        activeStyle={activeDropStyle}
+        style={[{ marginBottom: itemGap }, itemContainerStyle]}
       >
-        <Draggable.Handle style={styles.cardHandle}>
-          {renderItem({
-            item,
-            columnId,
-            index: itemIndex,
-            isDragging: false,
-            isOverlay: false,
-          })}
-        </Draggable.Handle>
-      </Draggable>
-    </Droppable>
+        <Draggable<BoardDragData<TItem>>
+          data={dragData}
+          draggableId={`board-draggable-${item.id}`}
+          preDragDelay={activationDelay}
+          collisionAlgorithm="center"
+          snapBackAfterDrop
+          style={sourceAnimatedStyle}
+        >
+          <Draggable.Handle style={styles.cardHandle}>
+            {renderItem({
+              item,
+              columnId,
+              index: itemIndex,
+              isDragging: false,
+              isOverlay: false,
+            })}
+          </Draggable.Handle>
+        </Draggable>
+      </Droppable>
+    </Animated.View>
   );
 }
 
@@ -253,6 +329,11 @@ export function SortableBoard<
   const rootPagePositionRef = useRef({ x: 0, y: 0 });
   const activeItemId = useSharedValue("");
   const activeColumnId = useSharedValue("");
+  const activeSourceColumnId = useSharedValue("");
+  const activeSourceIndex = useSharedValue(-1);
+  const previewColumnId = useSharedValue("");
+  const previewIndex = useSharedValue(-1);
+  const activeSlotHeight = useSharedValue(0);
   const overlayX = useSharedValue(0);
   const overlayY = useSharedValue(0);
 
@@ -371,30 +452,59 @@ export function SortableBoard<
         : dragData;
       activeItemId.value = nextDragData.itemId;
       activeColumnId.value = nextDragData.sourceColumnId;
+      activeSourceColumnId.value = nextDragData.sourceColumnId;
+      activeSourceIndex.value = nextDragData.sourceIndex;
+      previewColumnId.value = nextDragData.sourceColumnId;
+      previewIndex.value = nextDragData.sourceIndex;
       onDragStart?.(
         nextDragData.item,
         nextDragData.sourceColumnId,
         nextDragData.sourceIndex
       );
     },
-    [activeColumnId, activeItemId, itemLocations, measureRoot, onDragStart]
+    [
+      activeColumnId,
+      activeItemId,
+      activeSourceColumnId,
+      activeSourceIndex,
+      itemLocations,
+      measureRoot,
+      onDragStart,
+      previewColumnId,
+      previewIndex,
+    ]
   );
 
   const handleDragging = useCallback(
     (payload: DraggingPayload<BoardDragData<TItem>>) => {
       overlayX.value = payload.x + payload.tx - rootPagePositionRef.current.x;
       overlayY.value = payload.y + payload.ty - rootPagePositionRef.current.y;
+      activeSlotHeight.value = payload.height + itemGap;
     },
-    [overlayX, overlayY]
+    [activeSlotHeight, itemGap, overlayX, overlayY]
   );
 
   const handleDragEnd = useCallback(
     (dragData: BoardDragData<TItem>) => {
       activeItemId.value = "";
       activeColumnId.value = "";
+      activeSourceColumnId.value = "";
+      activeSourceIndex.value = -1;
+      previewColumnId.value = "";
+      previewIndex.value = -1;
+      activeSlotHeight.value = 0;
       onDragEnd?.(dragData.item);
     },
-    [activeColumnId, activeItemId, onDragEnd]
+    [
+      activeColumnId,
+      activeItemId,
+      activeSlotHeight,
+      activeSourceColumnId,
+      activeSourceIndex,
+      onDragEnd,
+      previewColumnId,
+      previewIndex,
+    ]
   );
 
   return (
@@ -424,6 +534,15 @@ export function SortableBoard<
             ]}
           >
             {columns.map((column, columnIndex) => {
+              const handleColumnActiveChange = (isActive: boolean) => {
+                if (!isActive) {
+                  return;
+                }
+
+                previewColumnId.value = column.id;
+                previewIndex.value = column.items.length;
+              };
+
               return (
                 <BoardColumnContainer
                   key={column.id}
@@ -438,6 +557,7 @@ export function SortableBoard<
                     dropPriority={0}
                     capacity={Infinity}
                     onDrop={(dragData) => moveItem(dragData, column.id)}
+                    onActiveChange={handleColumnActiveChange}
                     activeStyle={activeDropStyle}
                     style={styles.columnDropTarget}
                   >
@@ -462,6 +582,11 @@ export function SortableBoard<
                             itemGap={itemGap}
                             activationDelay={activationDelay}
                             activeItemId={activeItemId}
+                            activeSourceColumnId={activeSourceColumnId}
+                            activeSourceIndex={activeSourceIndex}
+                            previewColumnId={previewColumnId}
+                            previewIndex={previewIndex}
+                            activeSlotHeight={activeSlotHeight}
                             itemContainerStyle={itemContainerStyle}
                             activeDropStyle={activeDropStyle}
                             renderItem={renderItem}
@@ -475,6 +600,7 @@ export function SortableBoard<
                         dropPriority={20}
                         capacity={Infinity}
                         onDrop={(dragData) => moveItem(dragData, column.id)}
+                        onActiveChange={handleColumnActiveChange}
                         activeStyle={activeDropStyle}
                         style={styles.appendTarget}
                       >
