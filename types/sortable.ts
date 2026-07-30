@@ -1,4 +1,9 @@
-import { StyleProp, ViewStyle } from "react-native";
+import {
+  FlatListProps,
+  ScrollViewProps,
+  StyleProp,
+  ViewStyle,
+} from "react-native";
 import { GestureType } from "react-native-gesture-handler";
 import { SharedValue } from "react-native-reanimated";
 import { DropProviderRef } from "../types/context";
@@ -50,6 +55,40 @@ export interface SortablePositionSync {
   activeDragCount: SharedValue<number>;
   pendingPositions: SharedValue<{ [id: string]: number } | null>;
 }
+
+/**
+ * Native FlatList props that can be forwarded by Sortable. Props owned by the
+ * sortable implementation are omitted so consumers cannot replace its data,
+ * renderer, gesture-aware scroll handler, or layout styles.
+ */
+export type SortableFlatListProps<TData> = Omit<
+  FlatListProps<TData>,
+  | "data"
+  | "renderItem"
+  | "keyExtractor"
+  | "horizontal"
+  | "onScroll"
+  | "scrollEventThrottle"
+  | "style"
+  | "contentContainerStyle"
+  | "onScrollEndDrag"
+  | "onMomentumScrollEnd"
+>;
+
+/**
+ * Native ScrollView props that can be forwarded when `useFlatList` is false.
+ * Scroll and layout props managed by Sortable are intentionally omitted.
+ */
+export type SortableScrollViewProps = Omit<
+  ScrollViewProps,
+  | "horizontal"
+  | "onScroll"
+  | "scrollEventThrottle"
+  | "style"
+  | "contentContainerStyle"
+  | "onScrollEndDrag"
+  | "onMomentumScrollEnd"
+>;
 
 /**
  * Configuration options for the useSortable hook.
@@ -687,6 +726,19 @@ export interface SortableProps<TData extends SortableData> {
    * @default true
    */
   useFlatList?: boolean;
+
+  /**
+   * Additional native FlatList props. Useful for refresh controls and
+   * virtualization tuning such as `initialNumToRender`, `windowSize`, and
+   * `maxToRenderPerBatch`.
+   */
+  flatListProps?: SortableFlatListProps<TData>;
+
+  /**
+   * Additional native ScrollView props used when `useFlatList` is false.
+   * This can include a custom `refreshControl`.
+   */
+  scrollViewProps?: SortableScrollViewProps;
 }
 
 /**

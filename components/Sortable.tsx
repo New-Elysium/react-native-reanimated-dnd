@@ -53,6 +53,8 @@ function SortableComponent<TData extends { id: string }>({
   contentContainerStyle,
   itemKeyExtractor = (item) => item.id,
   useFlatList = true,
+  flatListProps,
+  scrollViewProps,
 }: SortableProps<TData>) {
   // Determine if dynamic height mode applies
   const isDynamicHeightMode = useMemo(() => {
@@ -90,6 +92,8 @@ function SortableComponent<TData extends { id: string }>({
         contentContainerStyle={contentContainerStyle}
         itemKeyExtractor={itemKeyExtractor}
         useFlatList={useFlatList}
+        flatListProps={flatListProps}
+        scrollViewProps={scrollViewProps}
       />
     );
   }
@@ -107,6 +111,8 @@ function SortableComponent<TData extends { id: string }>({
       contentContainerStyle={contentContainerStyle}
       itemKeyExtractor={itemKeyExtractor}
       useFlatList={useFlatList}
+      flatListProps={flatListProps}
+      scrollViewProps={scrollViewProps}
     />
   );
 }
@@ -123,6 +129,8 @@ function VerticalSortableContent<TData extends { id: string }>({
   contentContainerStyle,
   itemKeyExtractor,
   useFlatList,
+  flatListProps,
+  scrollViewProps,
 }: SortableProps<TData>) {
   const {
     positionSync,
@@ -161,6 +169,7 @@ function VerticalSortableContent<TData extends { id: string }>({
         <SortableListContext.Provider value={positionSync}>
           {useFlatList ? (
             <AnimatedFlatList
+              {...flatListProps}
               ref={scrollViewRef}
               data={data}
               keyExtractor={itemKeyExtractor as any}
@@ -179,6 +188,7 @@ function VerticalSortableContent<TData extends { id: string }>({
             />
           ) : (
             <AnimatedScrollView
+              {...scrollViewProps}
               ref={scrollViewRef}
               onScroll={handleScroll}
               scrollEventThrottle={16}
@@ -220,6 +230,8 @@ function HorizontalSortableContent<TData extends { id: string }>({
   contentContainerStyle,
   itemKeyExtractor,
   useFlatList,
+  flatListProps,
+  scrollViewProps,
 }: SortableProps<TData>) {
   const {
     positionSync,
@@ -258,6 +270,7 @@ function HorizontalSortableContent<TData extends { id: string }>({
         <SortableListContext.Provider value={positionSync}>
           {useFlatList ? (
             <AnimatedFlatList
+              {...flatListProps}
               ref={scrollViewRef}
               data={data}
               keyExtractor={itemKeyExtractor as any}
@@ -277,6 +290,7 @@ function HorizontalSortableContent<TData extends { id: string }>({
             />
           ) : (
             <AnimatedScrollView
+              {...scrollViewProps}
               ref={scrollViewRef}
               onScroll={handleScroll}
               scrollEventThrottle={16}

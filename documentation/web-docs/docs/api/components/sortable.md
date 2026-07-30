@@ -67,6 +67,32 @@ const renderTask = ({ item, id, positions, ...props }) => (
 
 ### Optional Props
 
+#### flatListProps
+
+- **Type**: `SortableFlatListProps<TData>`
+- **Default**: `undefined`
+- **Description**: Additional native `FlatList` props for refresh controls and virtualization tuning. Sortable-owned data, rendering, scroll, and layout props cannot be replaced.
+
+```tsx
+<Sortable
+  data={items}
+  itemHeight={64}
+  renderItem={renderItem}
+  flatListProps={{
+    initialNumToRender: 20,
+    windowSize: 9,
+    refreshing,
+    onRefresh,
+  }}
+/>
+```
+
+#### scrollViewProps
+
+- **Type**: `SortableScrollViewProps`
+- **Default**: `undefined`
+- **Description**: Additional native `ScrollView` props when `useFlatList={false}`, including a custom `refreshControl`.
+
 #### style
 
 - **Type**: `StyleProp<ViewStyle>`
