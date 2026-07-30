@@ -52,6 +52,7 @@ After countless attempts with drag-and-drop solutions that don't work or are sim
 - 🎪 **Smart Collision Detection** - Multiple algorithms (center, intersect, contain)
 - 📜 **Vertical & Horizontal Sortable Lists** - Drag and drop to sort lists in any direction with automatic scrolling
 - 🔲 **Sortable Grids** - 2D grid drag-and-drop with flexible layouts, insert and swap modes
+- ▤ **Kanban Boards** - Reorder cards within and across auto-scrolling columns
 - ↕ **Dynamic Heights** - Sortable lists with variable item heights
 - ⚡ **FlatList Performance** - Optional FlatList rendering for large datasets with virtualization
 - 🎭 **Drag Handles** - Precise control with dedicated drag areas
@@ -111,6 +112,7 @@ The example app includes:
 - ⇌ **Horizontal Sortable** - Reorderable horizontal scrolling list
 - 🔲 **Sortable Grid** - 2D grid reordering with insert/swap modes
 - ↕ **Dynamic Heights** - Sortable list with variable item heights
+- ▤ **Kanban Board** - Cross-list card movement with nested auto-scroll
 - 🎯 **Basic Drag & Drop** - Drag items to drop zones with pre-drag delay
 - 🎪 **Drag Handles** - Dedicated drag regions for precise control
 - 🎬 **Custom Animations** - Spring, timing, bounce & easing curves

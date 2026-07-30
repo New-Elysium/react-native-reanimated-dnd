@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
 } from "react";
 import { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native";
 import Animated from "react-native-reanimated";
@@ -69,8 +70,7 @@ function renderSortableContent(
   dropIndicatorStyle: StyleProp<ViewStyle> | undefined,
   children: React.ReactNode,
   panGestureHandler: SortableContextValue["panGestureHandler"],
-  handlePanGestureHandler: SortableContextValue["panGestureHandler"],
-  registerHandle: SortableContextValue["registerHandle"],
+  sortableContextValue: SortableContextValue,
   onLayout?: (event: LayoutChangeEvent) => void
 ) {
   const content = (
@@ -88,9 +88,7 @@ function renderSortableContent(
           ]}
         />
       )}
-      <SortableContext.Provider
-        value={{ panGestureHandler: handlePanGestureHandler, registerHandle }}
-      >
+      <SortableContext.Provider value={sortableContextValue}>
         <Animated.View style={style}>{children}</Animated.View>
       </SortableContext.Provider>
     </Animated.View>
@@ -169,6 +167,13 @@ function VerticalSortableItemInner<T>({
     },
     [id, isDynamicHeight, scheduleHeightUpdate]
   );
+  const sortableContextValue = useMemo<SortableContextValue>(
+    () => ({
+      panGestureHandler: handlePanGestureHandler,
+      registerHandle,
+    }),
+    [handlePanGestureHandler, registerHandle]
+  );
 
   return renderSortableContent(
     animatedStyle,
@@ -179,8 +184,7 @@ function VerticalSortableItemInner<T>({
     dropIndicatorStyle,
     children,
     panGestureHandler,
-    handlePanGestureHandler,
-    registerHandle,
+    sortableContextValue,
     isDynamicHeight && scheduleHeightUpdate ? handleLayout : undefined
   );
 }
@@ -240,6 +244,13 @@ function HorizontalSortableItemInner<T>({
     onDragging: onDraggingHorizontal,
     preDragDelay,
   });
+  const sortableContextValue = useMemo<SortableContextValue>(
+    () => ({
+      panGestureHandler: handlePanGestureHandler,
+      registerHandle,
+    }),
+    [handlePanGestureHandler, registerHandle]
+  );
 
   return renderSortableContent(
     animatedStyle,
@@ -250,8 +261,7 @@ function HorizontalSortableItemInner<T>({
     dropIndicatorStyle,
     children,
     panGestureHandler,
-    handlePanGestureHandler,
-    registerHandle
+    sortableContextValue
   );
 }
 

@@ -199,7 +199,6 @@ export const useDraggable = <TData = unknown>(
   const {
     getSlots,
     setActiveHoverSlot,
-    activeHoverSlotId,
     registerPositionUpdateListener,
     unregisterPositionUpdateListener,
     registerDroppedItem,
@@ -211,8 +210,11 @@ export const useDraggable = <TData = unknown>(
   } = useContext(SlotsContext) as SlotsContextValue<TData>;
   const latestDataRef = useRef(data);
   const contextOnDragEndRef = useRef(contextOnDragEnd);
-  latestDataRef.current = data;
-  contextOnDragEndRef.current = contextOnDragEnd;
+
+  useEffect(() => {
+    latestDataRef.current = data;
+    contextOnDragEndRef.current = contextOnDragEnd;
+  }, [contextOnDragEnd, data]);
 
   useEffect(() => {
     preDragDelayShared.value = preDragDelay;
@@ -438,6 +440,7 @@ export const useDraggable = <TData = unknown>(
 
       let hitSlotData: DropSlot<TData> | null = null;
       let hitSlotId: number | null = null;
+      let hitSlotPriority = Number.NEGATIVE_INFINITY;
 
       for (const key in slots) {
         const slotId = parseInt(key, 10);
@@ -454,11 +457,12 @@ export const useDraggable = <TData = unknown>(
 
         if (isCollision) {
           const hasCapacity = hasAvailableCapacity(s.id);
+          const priority = s.priority ?? 0;
 
-          if (hasCapacity) {
+          if (hasCapacity && priority > hitSlotPriority) {
             hitSlotData = s;
             hitSlotId = slotId;
-            break;
+            hitSlotPriority = priority;
           }
         }
       }
@@ -582,6 +586,7 @@ export const useDraggable = <TData = unknown>(
       const currentDraggableY = currentOriginY + currentTyVal;
 
       let newHoveredSlotId: number | null = null;
+      let hoveredPriority = Number.NEGATIVE_INFINITY;
       for (const key in slots) {
         const slotId = parseInt(key, 10);
         const s = slots[slotId];
@@ -595,28 +600,24 @@ export const useDraggable = <TData = unknown>(
           collisionAlgorithm
         );
 
-        if (isCollision) {
+        if (isCollision && (s.priority ?? 0) > hoveredPriority) {
           newHoveredSlotId = slotId;
-          break;
+          hoveredPriority = s.priority ?? 0;
         }
       }
-      if (activeHoverSlotId !== newHoveredSlotId) {
-        setActiveHoverSlot(newHoveredSlotId);
-      }
+      setActiveHoverSlot(newHoveredSlotId);
     },
-    [
-      getSlots,
-      setActiveHoverSlot,
-      activeHoverSlotId,
-      collisionAlgorithm,
-      performCollisionCheck,
-    ]
+    [getSlots, setActiveHoverSlot, collisionAlgorithm, performCollisionCheck]
   );
 
-  const gesture = React.useMemo<GestureType>(
-    () =>
+  const { gesture, handleGesture } = React.useMemo<{
+    gesture: GestureType;
+    handleGesture: GestureType;
+  }>(() => {
+    const createPanGesture = () =>
       Gesture.Pan()
         .activateAfterLongPress(preDragDelay)
+        .shouldCancelWhenOutside(false)
         // We use onStart to detect the initial drag start after the preDragDelay
         .onStart(() => {
           "worklet";
@@ -665,6 +666,8 @@ export const useDraggable = <TData = unknown>(
               y: originY.value,
               tx: tx.value,
               ty: ty.value,
+              width: itemW.value,
+              height: itemH.value,
               itemData: data,
             });
           }
@@ -674,6 +677,8 @@ export const useDraggable = <TData = unknown>(
               y: originY.value,
               tx: tx.value,
               ty: ty.value,
+              width: itemW.value,
+              height: itemH.value,
               itemData: data,
             });
           }
@@ -711,50 +716,58 @@ export const useDraggable = <TData = unknown>(
           }
 
           scheduleOnRN(setActiveHoverSlot, null);
-        }),
-    [
-      dragDisabledShared,
-      offsetX,
-      offsetY,
-      tx,
-      ty,
-      originX,
-      originY,
-      itemW,
-      itemH,
-      onDragStart,
-      data,
-      processDropAndAnimate,
-      updateHoverState,
-      setActiveHoverSlot,
-      animationFunction,
-      onDragging,
-      boundsAreSet,
-      boundsX,
-      boundsY,
-      boundsWidth,
-      boundsHeight,
-      dragAxisShared,
-      setState,
-      updateDraggablePositionWorklet,
-      contextOnDragging,
-      contextOnDragStart,
-      nodeReady,
-      preDragDelay,
-      dragStarted,
-      internalDraggableId,
-      animateDragEndPosition,
-      unregisterDroppedItem,
-      finishDragLifecycle,
-    ]
-  );
+        });
+
+    return {
+      gesture: createPanGesture().enabled(!dragDisabled && !hasHandle),
+      handleGesture: createPanGesture().enabled(!dragDisabled),
+    };
+  }, [
+    dragDisabledShared,
+    offsetX,
+    offsetY,
+    tx,
+    ty,
+    originX,
+    originY,
+    itemW,
+    itemH,
+    onDragStart,
+    data,
+    processDropAndAnimate,
+    updateHoverState,
+    setActiveHoverSlot,
+    animationFunction,
+    onDragging,
+    boundsAreSet,
+    boundsX,
+    boundsY,
+    boundsWidth,
+    boundsHeight,
+    dragAxisShared,
+    setState,
+    updateDraggablePositionWorklet,
+    contextOnDragging,
+    contextOnDragStart,
+    nodeReady,
+    preDragDelay,
+    dragStarted,
+    internalDraggableId,
+    animateDragEndPosition,
+    unregisterDroppedItem,
+    finishDragLifecycle,
+    dragDisabled,
+    hasHandle,
+  ]);
 
   const animatedStyleProp = useAnimatedStyle(() => {
     "worklet";
     return {
       transform: [{ translateX: tx.value }, { translateY: ty.value }] as const,
+      zIndex: dragStarted.value ? 1000 : 0,
+      elevation: dragStarted.value ? 1000 : 0,
     };
-  }, [tx, ty]);
+  }, [tx, ty, dragStarted]);
 
   // Replace the React useEffect with useAnimatedReaction to properly handle shared values
   useAnimatedReaction(
@@ -794,6 +807,7 @@ export const useDraggable = <TData = unknown>(
       onLayout: handleLayoutHandler,
     },
     gesture,
+    handleGesture,
     state,
     animatedViewRef,
     hasHandle,

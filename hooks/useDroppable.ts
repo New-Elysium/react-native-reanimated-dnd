@@ -159,6 +159,7 @@ export const useDroppable = <TData = unknown>(
     draggingStyle,
     droppableId,
     capacity,
+    dropPriority,
   } = options;
 
   // Create animated ref first
@@ -220,9 +221,19 @@ export const useDroppable = <TData = unknown>(
         dropAlignment: dropAlignment || "center",
         dropOffset: dropOffset || { x: 0, y: 0 },
         capacity,
+        priority: dropPriority ?? 0,
       });
     },
-    [id, droppableId, onDrop, register, dropAlignment, dropOffset, capacity]
+    [
+      id,
+      droppableId,
+      onDrop,
+      register,
+      dropAlignment,
+      dropOffset,
+      capacity,
+      dropPriority,
+    ]
   );
 
   const updateDroppablePosition = useCallback(() => {

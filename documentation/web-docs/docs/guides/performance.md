@@ -127,6 +127,34 @@ For long lists, `Sortable` supports FlatList-style virtualization out of the box
 />
 ```
 
+Use `flatListProps` to tune the built-in React Native `FlatList` for your
+content:
+
+```tsx
+<Sortable
+  data={items}
+  itemHeight={60}
+  flatListProps={{
+    initialNumToRender: 16,
+    maxToRenderPerBatch: 12,
+    windowSize: 7,
+    removeClippedSubviews: true,
+    getItemLayout: (_data, index) => ({
+      length: 60,
+      offset: 60 * index,
+      index,
+    }),
+  }}
+  renderItem={renderItem}
+/>
+```
+
+Third-party recycler list components such as FlashList and LegendList are not
+interchangeable with the internal list. Sortable items depend on the built-in
+list's measurement and absolute-position lifecycle while dragging. For large
+datasets, use `flatListProps`, keep item heights deterministic, and memoize the
+row renderer.
+
 ### Keep Item Components Light
 
 Heavy item components slow down reordering animations:
@@ -193,9 +221,7 @@ Use drag handles for large or complex draggable components. When a handle is pre
         <Text>⠿</Text>
       </View>
     </Draggable.Handle>
-    <ScrollView>
-      {/* Complex scrollable content */}
-    </ScrollView>
+    <ScrollView>{/* Complex scrollable content */}</ScrollView>
   </View>
 </Draggable>
 ```

@@ -62,6 +62,13 @@ const categories: Category[] = [
         component: "DynamicHeightExample",
         icon: `↕${TEXT}`,
       },
+      {
+        id: "kanbanBoard",
+        title: "Kanban Board",
+        description: "Reorder cards across auto-scrolling columns",
+        component: "KanbanBoardExample",
+        icon: `▤${TEXT}`,
+      },
     ],
   },
   {

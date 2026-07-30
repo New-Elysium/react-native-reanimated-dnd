@@ -275,6 +275,7 @@ export const Droppable = <TData = unknown,>({
   draggingStyle,
   droppableId,
   capacity,
+  dropPriority,
   style,
   children,
 }: DroppableProps<TData>): React.ReactElement => {
@@ -288,6 +289,7 @@ export const Droppable = <TData = unknown,>({
     draggingStyle,
     droppableId,
     capacity,
+    dropPriority,
   });
 
   // The style is now fully handled in the hook and returned via viewProps.style

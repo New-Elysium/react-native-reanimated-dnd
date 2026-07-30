@@ -16,6 +16,9 @@ import {
   UseHorizontalSortableListReturn,
 } from "../types/sortable";
 
+const defaultItemKeyExtractor = <TData extends { id: string }>(item: TData) =>
+  item.id;
+
 /**
  * A hook for managing horizontal sortable lists with drag-and-drop reordering capabilities.
  *
@@ -139,7 +142,7 @@ export function useHorizontalSortableList<TData extends { id: string }>(
     itemWidth,
     gap = 0,
     paddingHorizontal = 0,
-    itemKeyExtractor = (item) => item.id,
+    itemKeyExtractor = defaultItemKeyExtractor,
   } = options;
 
   // Runtime validation in development mode
@@ -202,7 +205,14 @@ export function useHorizontalSortableList<TData extends { id: string }>(
         positions.value = nextPositions;
       }
     });
-  }, [dataOrderKey]);
+  }, [
+    activeDragCount,
+    data,
+    dataOrderKey,
+    itemKeyExtractor,
+    pendingPositions,
+    positions,
+  ]);
 
   // Scrolling synchronization
   useAnimatedReaction(

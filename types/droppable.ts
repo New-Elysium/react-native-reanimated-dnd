@@ -184,6 +184,14 @@ export interface UseDroppableOptions<TData = unknown> {
    * ```
    */
   capacity?: number;
+
+  /**
+   * Collision priority used when this zone overlaps another droppable.
+   * The highest-priority matching zone receives the drop.
+   *
+   * @default 0
+   */
+  dropPriority?: number;
 }
 
 /**

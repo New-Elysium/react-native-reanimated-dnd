@@ -5,6 +5,8 @@ export { Sortable } from "./components/Sortable";
 export { SortableItem } from "./components/SortableItem";
 export { SortableGrid } from "./components/SortableGrid";
 export { SortableGridItem } from "./components/SortableGridItem";
+export { DropScrollView } from "./components/DropScrollView";
+export { SortableBoard } from "./components/SortableBoard";
 
 // Context
 export { DropProvider } from "./context/DropContext";

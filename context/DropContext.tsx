@@ -18,6 +18,8 @@ import {
   SlotsContextValue,
   SlotsContext,
   PositionUpdateListener,
+  DraggingListener,
+  DraggingPayload,
 } from "../types/context";
 
 /**
@@ -161,6 +163,28 @@ export const DropProvider = forwardRef<DropProviderRef, DropProviderProps>(
     const positionUpdateListenersRef = useRef<
       Record<string, PositionUpdateListener>
     >({});
+    const draggingListenersRef = useRef<Record<string, DraggingListener<any>>>(
+      {}
+    );
+
+    const registerSlot = useCallback((id: number, slot: DropSlot<any>) => {
+      slotsRef.current[id] = slot;
+    }, []);
+
+    const unregisterSlot = useCallback((id: number) => {
+      delete slotsRef.current[id];
+    }, []);
+
+    const isSlotRegistered = useCallback(
+      (id: number) => slotsRef.current[id] !== undefined,
+      []
+    );
+
+    const getSlots = useCallback(() => slotsRef.current, []);
+
+    const setActiveHoverSlot = useCallback((id: number | null) => {
+      setActiveHoverSlotIdState(id);
+    }, []);
 
     const registerPositionUpdateListener = useCallback(
       (id: string, listener: PositionUpdateListener) => {
@@ -172,6 +196,27 @@ export const DropProvider = forwardRef<DropProviderRef, DropProviderProps>(
     const unregisterPositionUpdateListener = useCallback((id: string) => {
       delete positionUpdateListenersRef.current[id];
     }, []);
+
+    const registerDraggingListener = useCallback(
+      (id: string, listener: DraggingListener<any>) => {
+        draggingListenersRef.current[id] = listener;
+      },
+      []
+    );
+
+    const unregisterDraggingListener = useCallback((id: string) => {
+      delete draggingListenersRef.current[id];
+    }, []);
+
+    const handleDragging = useCallback(
+      (payload: DraggingPayload<any>) => {
+        onDragging?.(payload);
+        Object.values(draggingListenersRef.current).forEach((listener) => {
+          listener(payload);
+        });
+      },
+      [onDragging]
+    );
 
     const updateDroppedItems = useCallback(
       (updater: (currentItems: DroppedItemsMap) => DroppedItemsMap) => {
@@ -293,42 +338,44 @@ export const DropProvider = forwardRef<DropProviderRef, DropProviderProps>(
     // Update the context value with the new method
     const contextValue = useMemo<SlotsContextValue<any>>(
       () => ({
-        register: (id, slot) => {
-          slotsRef.current[id] = slot;
-        },
-        unregister: (id) => {
-          delete slotsRef.current[id];
-        },
-        isRegistered: (id) => {
-          return slotsRef.current[id] !== undefined;
-        },
-        getSlots: () => slotsRef.current,
-        setActiveHoverSlot: (id: number | null) =>
-          setActiveHoverSlotIdState(id),
+        register: registerSlot,
+        unregister: unregisterSlot,
+        isRegistered: isSlotRegistered,
+        getSlots,
+        setActiveHoverSlot,
         activeHoverSlotId,
         registerPositionUpdateListener,
         unregisterPositionUpdateListener,
         requestPositionUpdate: internalRequestPositionUpdate,
+        registerDraggingListener,
+        unregisterDraggingListener,
         registerDroppedItem,
         unregisterDroppedItem,
         getDroppedItems,
         hasAvailableCapacity,
         isDragging,
-        onDragging,
+        onDragging: handleDragging,
         onDragStart: handleDragStart,
         onDragEnd: handleDragEnd,
       }),
       [
         activeHoverSlotId,
+        registerSlot,
+        unregisterSlot,
+        isSlotRegistered,
+        getSlots,
+        setActiveHoverSlot,
         registerPositionUpdateListener,
         unregisterPositionUpdateListener,
+        registerDraggingListener,
+        unregisterDraggingListener,
         internalRequestPositionUpdate,
         registerDroppedItem,
         unregisterDroppedItem,
         getDroppedItems,
         hasAvailableCapacity,
         isDragging,
-        onDragging,
+        handleDragging,
         handleDragStart,
         handleDragEnd,
       ]

@@ -1,0 +1,46 @@
+---
+title: "Kanban Board"
+---
+
+Use `SortableBoard` when items must move between multiple ordered lists.
+
+```tsx
+const [columns, setColumns] = useState([
+  {
+    id: "todo",
+    title: "To do",
+    items: [
+      { id: "research", title: "Research gestures" },
+      { id: "docs", title: "Write docs" },
+    ],
+  },
+  {
+    id: "done",
+    title: "Done",
+    items: [],
+  },
+]);
+
+<SortableBoard
+  columns={columns}
+  onChange={setColumns}
+  renderColumnHeader={(column) => <Text>{column.title}</Text>}
+  renderEmptyColumn={() => <Text>Drop a card here</Text>}
+  renderItem={({ item, isOverlay }) => (
+    <View style={[styles.card, isOverlay && styles.overlayCard]}>
+      <Text>{item.title}</Text>
+    </View>
+  )}
+/>;
+```
+
+The complete interactive implementation is available in
+`example-app/components/examples/KanbanBoardExample.tsx`.
+
+The example verifies:
+
+- reordering within one column;
+- moving a card between columns;
+- a drag overlay that stays above sibling lists;
+- horizontal and vertical edge auto-scroll;
+- a complete move event with source and destination indices.

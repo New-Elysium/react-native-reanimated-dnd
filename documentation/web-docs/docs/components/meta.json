@@ -4,6 +4,8 @@
     "draggable",
     "droppable",
     "sortable",
-    "sortable-item"
+    "sortable-item",
+    "sortable-board",
+    "drop-scroll-view"
   ]
 }

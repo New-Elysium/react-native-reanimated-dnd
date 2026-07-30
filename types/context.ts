@@ -83,10 +83,32 @@ export interface DropSlot<TData = unknown> {
   dropAlignment?: DropAlignment;
   dropOffset?: DropOffset;
   capacity?: number;
+  /**
+   * Collision priority used when drop zones overlap. Higher-priority zones
+   * win, which allows item-level targets to sit inside a larger container
+   * target.
+   *
+   * @default 0
+   */
+  priority?: number;
 }
 
 // Listener type for position updates
 export type PositionUpdateListener = () => void;
+
+export interface DraggingPayload<TData = unknown> {
+  x: number;
+  y: number;
+  tx: number;
+  ty: number;
+  width: number;
+  height: number;
+  itemData: TData;
+}
+
+export type DraggingListener<TData = unknown> = (
+  payload: DraggingPayload<TData>
+) => void;
 
 // Interface for the context value
 export interface SlotsContextValue<TData = unknown> {
@@ -102,6 +124,11 @@ export interface SlotsContextValue<TData = unknown> {
   ) => void;
   unregisterPositionUpdateListener: (id: string) => void;
   requestPositionUpdate: () => void;
+  registerDraggingListener: (
+    id: string,
+    listener: DraggingListener<TData>
+  ) => void;
+  unregisterDraggingListener: (id: string) => void;
 
   // Update method signatures to use string IDs for droppables
   registerDroppedItem: (
@@ -118,13 +145,7 @@ export interface SlotsContextValue<TData = unknown> {
   isDragging: boolean;
 
   // Add onDragging callback
-  onDragging?: (payload: {
-    x: number;
-    y: number;
-    tx: number;
-    ty: number;
-    itemData: any;
-  }) => void;
+  onDragging?: (payload: DraggingPayload<TData>) => void;
 
   // Internal lifecycle callbacks include the draggable ID so the provider can
   // safely track overlapping drags and clean up an unmounted draggable.
@@ -188,6 +209,20 @@ const defaultSlotsContextValue: SlotsContextValue<any> = {
       );
     }
   },
+  registerDraggingListener: (_id: string, _listener: DraggingListener<any>) => {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "SlotsContext: registerDraggingListener called without a Provider."
+      );
+    }
+  },
+  unregisterDraggingListener: (_id: string) => {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "SlotsContext: unregisterDraggingListener called without a Provider."
+      );
+    }
+  },
   // Update default implementations
   registerDroppedItem: (
     _draggableId: string,
@@ -222,13 +257,7 @@ const defaultSlotsContextValue: SlotsContextValue<any> = {
     return false;
   },
   isDragging: false,
-  onDragging: (payload: {
-    x: number;
-    y: number;
-    tx: number;
-    ty: number;
-    itemData: any;
-  }) => {
+  onDragging: (_payload: DraggingPayload<any>) => {
     if (process.env.NODE_ENV !== "production") {
       console.warn("SlotsContext: onDragging called without a Provider.");
     }
@@ -272,13 +301,7 @@ export interface DropProviderProps {
    *
    * @param payload - Position and data information for the dragging item
    */
-  onDragging?: (payload: {
-    x: number;
-    y: number;
-    tx: number;
-    ty: number;
-    itemData: any;
-  }) => void;
+  onDragging?: (payload: DraggingPayload<any>) => void;
 
   /**
    * Global callback fired when any drag operation starts.

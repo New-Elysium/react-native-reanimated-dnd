@@ -223,11 +223,18 @@ export function useSortable<T>(
       }
     }
     return pos * effectiveItemHeight;
-  }, []);
+  }, [
+    effectiveItemHeight,
+    estimatedItemHeight,
+    id,
+    isDynamicHeight,
+    itemHeights,
+    positions,
+  ]);
 
   const initialLowerBoundVal = useMemo(() => {
     return lowerBound.get();
-  }, []);
+  }, [lowerBound]);
 
   const positionY = useSharedValue(initialTopVal);
   const top = useSharedValue(initialTopVal);

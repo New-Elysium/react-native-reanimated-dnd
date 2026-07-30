@@ -1,5 +1,11 @@
 // Node Modules
-import React, { useRef, createContext, useContext, useState, useEffect } from "react";
+import React, {
+  useRef,
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+} from "react";
 import { ViewStyle, StyleProp } from "react-native";
 import Animated from "react-native-reanimated";
 import { GestureDetector } from "react-native-gesture-handler";
@@ -73,7 +79,9 @@ const Handle = ({ children, style }: DraggableHandleProps) => {
 
   return (
     <GestureDetector gesture={draggableContext.gesture}>
-      <Animated.View style={style}>{children}</Animated.View>
+      <Animated.View style={style} collapsable={false}>
+        {children}
+      </Animated.View>
     </GestureDetector>
   );
 };
@@ -260,12 +268,18 @@ const DraggableComponent = <TData = unknown,>({
   ...useDraggableHookOptions
 }: DraggableProps<TData>) => {
   // Pass the collected useDraggableHookOptions object directly to the hook
-  const { animatedViewProps, gesture, state, hasHandle, animatedViewRef, registerHandle } =
-    useDraggable<TData>(useDraggableHookOptions);
+  const {
+    animatedViewProps,
+    gesture,
+    handleGesture,
+    state,
+    animatedViewRef,
+    registerHandle,
+  } = useDraggable<TData>(useDraggableHookOptions);
 
   // Create the context value
   const contextValue: DraggableContextValue = {
-    gesture,
+    gesture: handleGesture,
     state,
     registerHandle,
   };
@@ -284,13 +298,9 @@ const DraggableComponent = <TData = unknown,>({
     </Animated.View>
   );
 
-  // If a handle is found, let the handle control the dragging
-  // Otherwise, the entire component is draggable
-  if (hasHandle) {
-    return content;
-  } else {
-    return <GestureDetector gesture={gesture}>{content}</GestureDetector>;
-  }
+  // Always keep the outer detector mounted. Its separate gesture is disabled
+  // when a handle is registered, avoiding native handler object reuse.
+  return <GestureDetector gesture={gesture}>{content}</GestureDetector>;
 };
 
 // Attach the Handle as a static property

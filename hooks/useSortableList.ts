@@ -11,6 +11,9 @@ import { scheduleOnUI } from "react-native-worklets";
 import { ScrollDirection, SortablePositionSync } from "../types/sortable";
 import { DropProviderRef } from "../types/context";
 
+const defaultItemKeyExtractor = <TData extends { id: string }>(item: TData) =>
+  item.id;
+
 export interface UseSortableListOptions<TData> {
   data: TData[];
   itemHeight?: number | number[] | ((item: TData, index: number) => number);
@@ -78,7 +81,7 @@ export function useSortableList<TData extends { id: string }>(
     enableDynamicHeights = false,
     estimatedItemHeight = 60,
     onHeightsMeasured,
-    itemKeyExtractor = (item) => item.id,
+    itemKeyExtractor = defaultItemKeyExtractor,
   } = options;
 
   // Determine if we're in dynamic height mode:
@@ -166,7 +169,14 @@ export function useSortableList<TData extends { id: string }>(
         positions.value = nextPositions;
       }
     });
-  }, [dataOrderKey]);
+  }, [
+    activeDragCount,
+    data,
+    dataOrderKey,
+    itemKeyExtractor,
+    pendingPositions,
+    positions,
+  ]);
 
   // Dynamic height shared values — initialized with estimated heights
   // so items are positioned correctly from the first frame.
@@ -183,7 +193,13 @@ export function useSortableList<TData extends { id: string }>(
       );
     });
     return heights;
-  }, []);
+  }, [
+    data,
+    estimatedItemHeight,
+    isDynamicHeight,
+    itemHeight,
+    itemKeyExtractor,
+  ]);
 
   const itemHeightsSV = useSharedValue<{ [id: string]: number }>(
     initialHeights
@@ -242,6 +258,7 @@ export function useSortableList<TData extends { id: string }>(
     itemHeight,
     estimatedItemHeight,
     itemKeyExtractor,
+    itemHeightsSV,
   ]);
 
   // Height update function called from onLayout on JS thread

@@ -5,6 +5,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { GestureType } from "react-native-gesture-handler";
 import { LayoutChangeEvent } from "react-native";
+import type { DraggingPayload } from "./context";
 
 /**
  * Enum representing the different states a draggable item can be in.
@@ -171,13 +172,7 @@ export interface UseDraggableOptions<TData = unknown> {
    * };
    * ```
    */
-  onDragging?: (payload: {
-    x: number;
-    y: number;
-    tx: number;
-    ty: number;
-    itemData: TData;
-  }) => void;
+  onDragging?: (payload: DraggingPayload<TData>) => void;
 
   /**
    * Callback fired when the draggable state changes.
@@ -296,6 +291,12 @@ export interface UseDraggableReturn {
    * Only used when no handle is present (entire component is draggable).
    */
   gesture: GestureType;
+
+  /**
+   * Separate gesture instance used by Draggable.Handle. Keeping it separate
+   * avoids attaching one native handler object to two GestureDetectors.
+   */
+  handleGesture: GestureType;
 
   /**
    * Current state of the draggable item.

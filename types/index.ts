@@ -9,6 +9,8 @@ export * from "./sortable";
 
 // Re-export all context types
 export * from "./context";
+export * from "./dropScrollView";
+export * from "./sortableBoard";
 
 // Re-export all grid types
 export * from "./grid";
