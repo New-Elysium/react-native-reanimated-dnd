@@ -140,7 +140,10 @@ export interface SlotsContextValue<TData = unknown> {
   getDroppedItems: () => DroppedItemsMap<any>;
 
   // Add new method to check if a droppable has available capacity
-  hasAvailableCapacity: (droppableId: string) => boolean;
+  hasAvailableCapacity: (
+    droppableId: string,
+    activeDraggableId?: string
+  ) => boolean;
 
   isDragging: boolean;
 
@@ -248,7 +251,7 @@ const defaultSlotsContextValue: SlotsContextValue<any> = {
     }
     return {} as DroppedItemsMap<any>;
   },
-  hasAvailableCapacity: (_droppableId: string) => {
+  hasAvailableCapacity: (_droppableId: string, _activeDraggableId?: string) => {
     if (process.env.NODE_ENV !== "production") {
       console.warn(
         "SlotsContext: hasAvailableCapacity called without a Provider."

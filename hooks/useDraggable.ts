@@ -456,7 +456,7 @@ export const useDraggable = <TData = unknown>(
         );
 
         if (isCollision) {
-          const hasCapacity = hasAvailableCapacity(s.id);
+          const hasCapacity = hasAvailableCapacity(s.id, internalDraggableId);
           const priority = s.priority ?? 0;
 
           if (hasCapacity && priority > hitSlotPriority) {
@@ -600,14 +600,23 @@ export const useDraggable = <TData = unknown>(
           collisionAlgorithm
         );
 
-        if (isCollision && (s.priority ?? 0) > hoveredPriority) {
+        const hasCapacity = hasAvailableCapacity(s.id, internalDraggableId);
+
+        if (isCollision && hasCapacity && (s.priority ?? 0) > hoveredPriority) {
           newHoveredSlotId = slotId;
           hoveredPriority = s.priority ?? 0;
         }
       }
       setActiveHoverSlot(newHoveredSlotId);
     },
-    [getSlots, setActiveHoverSlot, collisionAlgorithm, performCollisionCheck]
+    [
+      getSlots,
+      setActiveHoverSlot,
+      collisionAlgorithm,
+      performCollisionCheck,
+      hasAvailableCapacity,
+      internalDraggableId,
+    ]
   );
 
   const { gesture, handleGesture } = React.useMemo<{

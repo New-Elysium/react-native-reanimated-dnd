@@ -278,10 +278,19 @@ export const DropProvider = forwardRef<DropProviderRef, DropProviderProps>(
 
     // Add a method to check if a droppable has capacity available
     const hasAvailableCapacity = useCallback(
-      (droppableId: string) => {
-        // Find all draggables currently dropped on this droppable
-        const droppedCount = Object.values(droppedItems).filter(
-          (item) => item.droppableId === droppableId
+      (droppableId: string, activeDraggableId?: string) => {
+        const activeDraggableIds = activeDraggableIdsRef.current;
+
+        // A retained item temporarily vacates its current slot while it is
+        // being dragged. When a specific draggable is supplied, only exclude
+        // that item. The no-ID form is used by droppable styling and excludes
+        // every item currently in transit.
+        const droppedCount = Object.entries(droppedItems).filter(
+          ([draggableId, item]) =>
+            item.droppableId === droppableId &&
+            draggableId !== activeDraggableId &&
+            (activeDraggableId !== undefined ||
+              !activeDraggableIds.has(draggableId))
         ).length;
 
         // Find the droppable's registered capacity
