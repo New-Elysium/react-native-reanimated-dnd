@@ -69,6 +69,12 @@ const { animatedStyle, panGestureHandler } = useSortable({
 
 #### Optional Parameters
 
+##### disabled
+
+- **Type**: `boolean`
+- **Default**: `false`
+- **Description**: Prevent this item from initiating a drag while keeping it in the reorderable position map.
+
 ##### containerHeight
 
 - **Type**: `number`

@@ -87,6 +87,9 @@ export interface UseSortableOptions<T> {
   /** @internal List-owned synchronization state. */
   positionSync?: SortablePositionSync;
 
+  /** Whether this item is prevented from initiating a drag. */
+  disabled?: boolean;
+
   /**
    * Shared value representing the current scroll position (lower bound) of the container.
    * Used for auto-scrolling during drag operations.
@@ -526,6 +529,14 @@ export interface SortableItemProps<T> {
   /** @internal List-owned synchronization state. */
   positionSync?: SortablePositionSync;
 
+  /**
+   * Whether this item is prevented from initiating a drag. Other items can
+   * still move before or after it.
+   *
+   * @default false
+   */
+  disabled?: boolean;
+
   /** Shared value representing the current scroll position (for vertical) */
   lowerBound?: SharedValue<number>;
 
@@ -782,6 +793,9 @@ export interface UseHorizontalSortableOptions<T> {
   /** @internal List-owned synchronization state. */
   positionSync?: SortablePositionSync;
 
+  /** Whether this item is prevented from initiating a drag. */
+  disabled?: boolean;
+
   /**
    * Shared value representing the current scroll position (left bound) of the container.
    * Used for auto-scrolling during drag operations.
@@ -1027,6 +1041,14 @@ export interface HorizontalSortableItemProps<T> {
 
   /** @internal List-owned synchronization state. */
   positionSync?: SortablePositionSync;
+
+  /**
+   * Whether this item is prevented from initiating a drag. Other items can
+   * still move before or after it.
+   *
+   * @default false
+   */
+  disabled?: boolean;
 
   /** Shared value representing the current scroll position */
   leftBound: SharedValue<number>;

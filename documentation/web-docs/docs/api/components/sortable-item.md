@@ -78,6 +78,18 @@ import { SortableItem } from "react-native-reanimated-dnd";
 
 ### Optional Props
 
+#### disabled
+
+- **Type**: `boolean`
+- **Default**: `false`
+- **Description**: Prevent this item from initiating a drag. Other items can still be reordered before or after it.
+
+```tsx
+<SortableItem disabled={item.type === "header"} {...sortableProps}>
+  <Text>{item.title}</Text>
+</SortableItem>
+```
+
 #### data
 
 - **Type**: `T`

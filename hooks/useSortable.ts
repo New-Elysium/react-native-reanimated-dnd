@@ -119,6 +119,7 @@ export interface UseSortableOptions<T> {
   id: string;
   positions: SharedValue<{ [id: string]: number }>;
   positionSync?: SortablePositionSync;
+  disabled?: boolean;
   lowerBound: SharedValue<number>;
   autoScrollDirection: SharedValue<ScrollDirection>;
   itemsCount: number;
@@ -180,6 +181,7 @@ export function useSortable<T>(
     id,
     positions,
     positionSync,
+    disabled = false,
     lowerBound,
     autoScrollDirection,
     itemsCount,
@@ -540,11 +542,14 @@ export function useSortable<T>(
       });
 
   // Main gesture for full-item dragging — disabled when a handle is registered
-  const panGestureHandler: GestureType = createPanGesture().enabled(!hasHandle);
+  const panGestureHandler: GestureType = createPanGesture().enabled(
+    !disabled && !hasHandle
+  );
 
   // Separate gesture for handle-only dragging (avoids sharing a gesture
   // object between two GestureDetectors and the handlerTag mutation warning)
-  const handlePanGestureHandler: GestureType = createPanGesture();
+  const handlePanGestureHandler: GestureType =
+    createPanGesture().enabled(!disabled);
 
   const animatedStyle = useAnimatedStyle(() => {
     "worklet";

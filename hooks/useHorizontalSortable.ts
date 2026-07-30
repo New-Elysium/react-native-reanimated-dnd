@@ -142,6 +142,7 @@ export function useHorizontalSortable<T>(
     id,
     positions,
     positionSync,
+    disabled = false,
     leftBound,
     autoScrollDirection,
     itemsCount,
@@ -419,10 +420,13 @@ export function useHorizontalSortable<T>(
       });
 
   // Main gesture for full-item dragging — disabled when a handle is registered
-  const panGestureHandler: GestureType = createPanGesture().enabled(!hasHandle);
+  const panGestureHandler: GestureType = createPanGesture().enabled(
+    !disabled && !hasHandle
+  );
 
   // Separate gesture for handle-only dragging
-  const handlePanGestureHandler: GestureType = createPanGesture();
+  const handlePanGestureHandler: GestureType =
+    createPanGesture().enabled(!disabled);
 
   const animatedStyle = useAnimatedStyle(() => {
     "worklet";
