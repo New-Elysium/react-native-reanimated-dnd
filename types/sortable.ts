@@ -1014,6 +1014,14 @@ export interface HorizontalSortableItemProps<T> {
   /** Width of the scrollable container (optional) */
   containerWidth?: number;
 
+  /**
+   * Long-press duration in milliseconds before the drag gesture activates.
+   * Pass `0` for immediate activation when using a dedicated drag handle.
+   *
+   * @default 200
+   */
+  preDragDelay?: number;
+
   /** Child components to render inside the sortable item */
   children: ReactNode;
 
