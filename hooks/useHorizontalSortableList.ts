@@ -156,6 +156,7 @@ export function useHorizontalSortableList<TData extends { id: string }>(
   // Set up shared values
   const positions = useSharedValue(listToObject(data));
   const scrollX = useSharedValue(0);
+  const nativeScrollX = useSharedValue(0);
   const autoScroll = useSharedValue(HorizontalScrollDirection.None);
   const scrollViewRef = useAnimatedRef();
   const dropProviderRef = useRef<DropProviderRef | null>(null);
@@ -164,12 +165,15 @@ export function useHorizontalSortableList<TData extends { id: string }>(
   useAnimatedReaction(
     () => scrollX.value,
     (scrolling) => {
-      scrollTo(scrollViewRef, scrolling, 0, false);
+      if (scrolling !== nativeScrollX.value) {
+        scrollTo(scrollViewRef, scrolling, 0, false);
+      }
     }
   );
 
   // Handle scroll events
   const handleScroll = useAnimatedScrollHandler((event) => {
+    nativeScrollX.value = event.contentOffset.x;
     scrollX.value = event.contentOffset.x;
   });
 

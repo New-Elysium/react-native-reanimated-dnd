@@ -61,6 +61,8 @@ export function useGridSortableList<TData extends SortableData>(
   );
   const scrollY = useSharedValue(0);
   const scrollX = useSharedValue(0);
+  const nativeScrollY = useSharedValue(0);
+  const nativeScrollX = useSharedValue(0);
   const autoScrollDirection = useSharedValue(GridScrollDirection.None);
   const scrollViewRef = useAnimatedRef();
   const dropProviderRef = useRef<DropProviderRef>(null);
@@ -84,19 +86,25 @@ export function useGridSortableList<TData extends SortableData>(
   useAnimatedReaction(
     () => scrollY.value,
     (scrolling) => {
-      scrollTo(scrollViewRef, scrollX.value, scrolling, false);
+      if (scrolling !== nativeScrollY.value) {
+        scrollTo(scrollViewRef, scrollX.value, scrolling, false);
+      }
     }
   );
 
   useAnimatedReaction(
     () => scrollX.value,
     (scrolling) => {
-      scrollTo(scrollViewRef, scrolling, scrollY.value, false);
+      if (scrolling !== nativeScrollX.value) {
+        scrollTo(scrollViewRef, scrolling, scrollY.value, false);
+      }
     }
   );
 
   // Handle scroll events
   const handleScroll = useAnimatedScrollHandler((event) => {
+    nativeScrollY.value = event.contentOffset.y;
+    nativeScrollX.value = event.contentOffset.x;
     scrollY.value = event.contentOffset.y;
     scrollX.value = event.contentOffset.x;
   });
