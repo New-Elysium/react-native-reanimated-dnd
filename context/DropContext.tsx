@@ -152,6 +152,8 @@ export const DropProvider = forwardRef<DropProviderRef, DropProviderProps>(
     const [activeHoverSlotId, setActiveHoverSlotIdState] = useState<
       number | null
     >(null);
+    const [isDragging, setIsDragging] = useState<boolean>(false);
+    const activeDraggableIdsRef = useRef<Set<string>>(new Set());
 
     // New state for tracking dropped items
     const [droppedItems, setDroppedItems] = useState<DroppedItemsMap>({});
@@ -256,13 +258,36 @@ export const DropProvider = forwardRef<DropProviderRef, DropProviderProps>(
 
     // Create a wrapper for onDragStart that also triggers position update
     const handleDragStart = useCallback(
-      (data: any) => {
+      (data: any, draggableId: string) => {
+        const activeDraggableIds = activeDraggableIdsRef.current;
+        if (activeDraggableIds.has(draggableId)) {
+          return;
+        }
+
+        activeDraggableIds.add(draggableId);
+        setIsDragging(activeDraggableIds.size > 0);
         if (onDragStart) {
           onDragStart(data);
         }
         internalRequestPositionUpdate();
       },
       [onDragStart, internalRequestPositionUpdate]
+    );
+
+    const handleDragEnd = useCallback(
+      (data: any, draggableId: string) => {
+        const activeDraggableIds = activeDraggableIdsRef.current;
+        if (!activeDraggableIds.delete(draggableId)) {
+          return;
+        }
+
+        setIsDragging(activeDraggableIds.size > 0);
+        if (onDragEnd) {
+          onDragEnd(data);
+        }
+        internalRequestPositionUpdate();
+      },
+      [onDragEnd, internalRequestPositionUpdate]
     );
 
     // Update the context value with the new method
@@ -288,9 +313,10 @@ export const DropProvider = forwardRef<DropProviderRef, DropProviderProps>(
         unregisterDroppedItem,
         getDroppedItems,
         hasAvailableCapacity,
+        isDragging,
         onDragging,
         onDragStart: handleDragStart,
-        onDragEnd,
+        onDragEnd: handleDragEnd,
       }),
       [
         activeHoverSlotId,
@@ -301,9 +327,10 @@ export const DropProvider = forwardRef<DropProviderRef, DropProviderProps>(
         unregisterDroppedItem,
         getDroppedItems,
         hasAvailableCapacity,
+        isDragging,
         onDragging,
         handleDragStart,
-        onDragEnd,
+        handleDragEnd,
       ]
     );
 

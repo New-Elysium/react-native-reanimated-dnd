@@ -156,6 +156,7 @@ export const useDroppable = <TData = unknown>(
     dropAlignment,
     dropOffset,
     activeStyle,
+    draggingStyle,
     droppableId,
     capacity,
   } = options;
@@ -175,55 +176,31 @@ export const useDroppable = <TData = unknown>(
     unregister,
     isRegistered,
     activeHoverSlotId: contextActiveHoverSlotId,
+    isDragging,
+    hasAvailableCapacity,
     registerPositionUpdateListener,
     unregisterPositionUpdateListener,
   } = useContext(SlotsContext) as SlotsContextValue<TData>;
 
-  const isActive = contextActiveHoverSlotId === id;
+  const canAcceptDrop = !dropDisabled && hasAvailableCapacity(stringId);
+  const isActive = contextActiveHoverSlotId === id && canAcceptDrop;
 
-  // Process active style to separate transforms from other styles
-  const { processedActiveStyle, activeTransforms } = useMemo(() => {
-    if (!isActive || !activeStyle) {
-      return { processedActiveStyle: null, activeTransforms: [] };
-    }
-
-    const flattenedStyle = StyleSheet.flatten(activeStyle);
-    let processedStyle = { ...flattenedStyle };
-    let transforms: any[] = [];
-
-    // Extract and process transforms if present
-    if (flattenedStyle.transform) {
-      if (Array.isArray(flattenedStyle.transform)) {
-        transforms = [...flattenedStyle.transform];
-      }
-
-      // Remove transform from the main style to avoid conflicts
-      delete processedStyle.transform;
-    }
-
-    return {
-      processedActiveStyle: processedStyle,
-      activeTransforms: transforms,
-    };
-  }, [isActive, activeStyle]);
-
-  // Create the final style with transforms properly handled
+  // Flattening the styles together preserves React Native's normal precedence:
+  // activeStyle replaces matching draggingStyle properties, including transform.
   const combinedActiveStyle = useMemo(() => {
-    if (!isActive || !activeStyle) {
+    const shouldApplyDraggingStyle =
+      isDragging && canAcceptDrop && draggingStyle;
+    const shouldApplyActiveStyle = isActive && activeStyle;
+
+    if (!shouldApplyDraggingStyle && !shouldApplyActiveStyle) {
       return undefined;
     }
 
-    // If there are no transforms, just return the processed style
-    if (activeTransforms.length === 0) {
-      return processedActiveStyle;
-    }
-
-    // Add transforms to the style
-    return {
-      ...processedActiveStyle,
-      transform: activeTransforms,
-    };
-  }, [isActive, activeStyle, processedActiveStyle, activeTransforms]);
+    return StyleSheet.flatten([
+      shouldApplyDraggingStyle && draggingStyle,
+      shouldApplyActiveStyle && activeStyle,
+    ]);
+  }, [isActive, activeStyle, isDragging, canAcceptDrop, draggingStyle]);
 
   useEffect(() => {
     onActiveChange?.(isActive);
@@ -325,6 +302,7 @@ export const useDroppable = <TData = unknown>(
       style: combinedActiveStyle,
     },
     isActive,
+    isDragging,
     activeStyle,
     animatedViewRef,
   };

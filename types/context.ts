@@ -115,6 +115,8 @@ export interface SlotsContextValue<TData = unknown> {
   // Add new method to check if a droppable has available capacity
   hasAvailableCapacity: (droppableId: string) => boolean;
 
+  isDragging: boolean;
+
   // Add onDragging callback
   onDragging?: (payload: {
     x: number;
@@ -124,9 +126,10 @@ export interface SlotsContextValue<TData = unknown> {
     itemData: any;
   }) => void;
 
-  // Add onDragStart and onDragEnd callbacks
-  onDragStart?: (data: any) => void;
-  onDragEnd?: (data: any) => void;
+  // Internal lifecycle callbacks include the draggable ID so the provider can
+  // safely track overlapping drags and clean up an unmounted draggable.
+  onDragStart?: (data: any, draggableId: string) => void;
+  onDragEnd?: (data: any, draggableId: string) => void;
 }
 
 // Default context value using 'any' for broad compatibility
@@ -218,6 +221,7 @@ const defaultSlotsContextValue: SlotsContextValue<any> = {
     }
     return false;
   },
+  isDragging: false,
   onDragging: (payload: {
     x: number;
     y: number;

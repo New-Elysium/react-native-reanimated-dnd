@@ -47,6 +47,12 @@ export function ActiveStylesExample({ onBack }: ActiveStylesExampleProps) {
     boxShadow: "0px 0px 12px rgba(76, 201, 240, 0.7)",
   };
 
+  const draggingStyle: StyleProp<ViewStyle> = {
+    backgroundColor: "rgba(250, 204, 21, 0.18)",
+    borderColor: "#facc15",
+    borderWidth: 2,
+  };
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <View style={styles.container}>
@@ -59,7 +65,8 @@ export function ActiveStylesExample({ onBack }: ActiveStylesExampleProps) {
             scrollEventThrottle={16}
           >
             <Text style={styles.sectionDescription}>
-              Drag the item over each zone to see different hover effects.
+              Start dragging to reveal valid drop zones, then hover over each
+              zone to see its active effect.
             </Text>
 
             <View style={styles.dropZoneArea}>
@@ -69,14 +76,17 @@ export function ActiveStylesExample({ onBack }: ActiveStylesExampleProps) {
                   droppableId="pulse-zone"
                   style={styles.customDropZone}
                   onDrop={(data: DraggableItemData) =>
-                    showToast({ title: "Pulse!", subtitle: "Landed on the Pulse Zone", autodismiss: true })
+                    showToast({
+                      title: "Pulse!",
+                      subtitle: "Landed on the Pulse Zone",
+                      autodismiss: true,
+                    })
                   }
+                  draggingStyle={draggingStyle}
                   activeStyle={pulseActiveStyle}
                 >
                   <Text style={styles.dropZoneText}>Pulse Zone</Text>
-                  <Text style={styles.dZoneSubText}>
-                    Scales + red glow
-                  </Text>
+                  <Text style={styles.dZoneSubText}>Scales + red glow</Text>
                 </Droppable>
               </View>
 
@@ -86,14 +96,17 @@ export function ActiveStylesExample({ onBack }: ActiveStylesExampleProps) {
                   droppableId="glow-zone"
                   style={styles.customDropZone}
                   onDrop={(data: DraggableItemData) =>
-                    showToast({ title: "Glow!", subtitle: "Landed on the Glow Zone", autodismiss: true })
+                    showToast({
+                      title: "Glow!",
+                      subtitle: "Landed on the Glow Zone",
+                      autodismiss: true,
+                    })
                   }
+                  draggingStyle={draggingStyle}
                   activeStyle={glowActiveStyle}
                 >
                   <Text style={styles.dropZoneText}>Glow Zone</Text>
-                  <Text style={styles.dZoneSubText}>
-                    Blue background glow
-                  </Text>
+                  <Text style={styles.dZoneSubText}>Blue background glow</Text>
                 </Droppable>
               </View>
             </View>
@@ -128,12 +141,28 @@ export function ActiveStylesExample({ onBack }: ActiveStylesExampleProps) {
 
             <View style={styles.legend}>
               <View style={styles.legendRow}>
-                <View style={[styles.legendDot, { backgroundColor: "#ff6b6b" }]} />
-                <Text style={styles.legendText}>Pulse: Scale + red border glow</Text>
+                <View
+                  style={[styles.legendDot, { backgroundColor: "#facc15" }]}
+                />
+                <Text style={styles.legendText}>
+                  Yellow: Available while dragging
+                </Text>
               </View>
               <View style={styles.legendRow}>
-                <View style={[styles.legendDot, { backgroundColor: "#4cc9f0" }]} />
-                <Text style={styles.legendText}>Glow: Blue background illumination</Text>
+                <View
+                  style={[styles.legendDot, { backgroundColor: "#ff6b6b" }]}
+                />
+                <Text style={styles.legendText}>
+                  Pulse: Scale + red border glow
+                </Text>
+              </View>
+              <View style={styles.legendRow}>
+                <View
+                  style={[styles.legendDot, { backgroundColor: "#4cc9f0" }]}
+                />
+                <Text style={styles.legendText}>
+                  Glow: Blue background illumination
+                </Text>
               </View>
             </View>
           </ScrollView>

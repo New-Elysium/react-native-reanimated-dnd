@@ -178,6 +178,7 @@ export const useDraggable = <TData = unknown>(
   const dragAxisShared = useSharedValue(dragAxis);
   const preDragDelayShared = useSharedValue(preDragDelay);
   const nodeReady = useSharedValue(false);
+  const dragStarted = useSharedValue(false);
 
   const originX = useSharedValue(0);
   const originY = useSharedValue(0);
@@ -207,6 +208,10 @@ export const useDraggable = <TData = unknown>(
     onDragStart: contextOnDragStart,
     onDragEnd: contextOnDragEnd,
   } = useContext(SlotsContext) as SlotsContextValue<TData>;
+  const latestDataRef = useRef(data);
+  const contextOnDragEndRef = useRef(contextOnDragEnd);
+  latestDataRef.current = data;
+  contextOnDragEndRef.current = contextOnDragEnd;
 
   useEffect(() => {
     preDragDelayShared.value = preDragDelay;
@@ -599,12 +604,15 @@ export const useDraggable = <TData = unknown>(
           //first update the position
           updateDraggablePositionWorklet();
           if (dragDisabledShared.value) return;
+          dragStarted.value = true;
           offsetX.value = tx.value;
           offsetY.value = ty.value;
           // Update state to DRAGGING when drag begins
           scheduleOnRN(setState, DraggableState.DRAGGING);
           if (onDragStart) scheduleOnRN(onDragStart, data);
-          if (contextOnDragStart) scheduleOnRN(contextOnDragStart, data);
+          if (contextOnDragStart) {
+            scheduleOnRN(contextOnDragStart, data, internalDraggableId);
+          }
         })
         .onUpdate((event: PanGestureHandlerEventPayload) => {
           "worklet";
@@ -659,21 +667,33 @@ export const useDraggable = <TData = unknown>(
             itemH.value
           );
         })
-        .onEnd(() => {
+        .onFinalize((_event, success) => {
           "worklet";
-          if (dragDisabledShared.value) return;
+          if (!dragStarted.value) return;
+          dragStarted.value = false;
+
           if (onDragEnd) scheduleOnRN(onDragEnd, data);
-          if (contextOnDragEnd) scheduleOnRN(contextOnDragEnd, data);
-          scheduleOnRN(
-            processDropAndAnimate,
-            tx.value,
-            ty.value,
-            data,
-            originX.value,
-            originY.value,
-            itemW.value,
-            itemH.value
-          );
+          if (contextOnDragEnd) {
+            scheduleOnRN(contextOnDragEnd, data, internalDraggableId);
+          }
+
+          if (success) {
+            scheduleOnRN(
+              processDropAndAnimate,
+              tx.value,
+              ty.value,
+              data,
+              originX.value,
+              originY.value,
+              itemW.value,
+              itemH.value
+            );
+          } else {
+            animateDragEndPosition(0, 0);
+            scheduleOnRN(setState, DraggableState.IDLE);
+            scheduleOnRN(unregisterDroppedItem, internalDraggableId);
+          }
+
           scheduleOnRN(setActiveHoverSlot, null);
         }),
     [
@@ -707,6 +727,10 @@ export const useDraggable = <TData = unknown>(
       contextOnDragEnd,
       nodeReady,
       preDragDelay,
+      dragStarted,
+      internalDraggableId,
+      animateDragEndPosition,
+      unregisterDroppedItem,
     ]
   );
 
@@ -745,6 +769,7 @@ export const useDraggable = <TData = unknown>(
     return () => {
       // Clean up any registered drops when unmounting
       unregisterDroppedItem(internalDraggableId);
+      contextOnDragEndRef.current?.(latestDataRef.current, internalDraggableId);
     };
   }, [internalDraggableId, unregisterDroppedItem]);
 
