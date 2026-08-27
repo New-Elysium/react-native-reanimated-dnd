@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "outDir": "./.test-build",
+    "declaration": false,
+    "noEmitHelpers": false,
+    "types": ["node"]
+  },
+  "exclude": ["node_modules", "lib"],
+  "include": [
+    "utils/gridCalculations.ts",
+    "types/grid.ts",
+    "types/sortable.ts",
+    "tests/**/*.ts"
+  ]
+}

@@ -10,12 +10,143 @@ import {
 import { SortableData } from "../types/sortable";
 
 /**
+ * Items without an entry in `dimensions.itemHeights` fall back to `itemHeight`.
+ */
+export function getGridItemHeight(
+  itemId: string,
+  dimensions: GridDimensions
+): number {
+  "worklet";
+
+  const customHeight = dimensions.itemHeights
+    ? dimensions.itemHeights[itemId]
+    : undefined;
+
+  return customHeight !== undefined && customHeight > 0
+    ? customHeight
+    : dimensions.itemHeight;
+}
+
+/**
+ * Row-band heights for an id -> index assignment: each band (vertical:
+ * floor(index / columns), horizontal: index % rows) is sized to its tallest
+ * item. Single source of truth for variable-height geometry.
+ */
+export function computeGridBandHeights(
+  indexById: { [id: string]: number },
+  dimensions: GridDimensions,
+  orientation: GridOrientation,
+  itemsCount: number
+): number[] {
+  "worklet";
+
+  const { columns = 3, rows = 3, itemHeight } = dimensions;
+
+  const bandCount =
+    orientation === GridOrientation.Vertical
+      ? Math.ceil(itemsCount / columns)
+      : rows;
+
+  const bandHeights: number[] = [];
+  for (let band = 0; band < bandCount; band++) {
+    bandHeights.push(0);
+  }
+
+  for (const id in indexById) {
+    const index = indexById[id];
+    if (index < 0 || index >= itemsCount) {
+      continue;
+    }
+    const band =
+      orientation === GridOrientation.Vertical
+        ? Math.floor(index / columns)
+        : index % rows;
+    const height = getGridItemHeight(id, dimensions);
+    if (height > bandHeights[band]) {
+      bandHeights[band] = height;
+    }
+  }
+
+  // Empty bands (fewer items than fixed rows) keep the default slot height
+  for (let band = 0; band < bandCount; band++) {
+    if (bandHeights[band] <= 0) {
+      bandHeights[band] = itemHeight;
+    }
+  }
+
+  return bandHeights;
+}
+
+/**
+ * Row-band heights for the live positions object.
+ */
+export function computeGridBands(
+  positions: GridPositions,
+  dimensions: GridDimensions,
+  orientation: GridOrientation,
+  itemsCount: number
+): number[] {
+  "worklet";
+
+  const indexById: { [id: string]: number } = {};
+  for (const id in positions) {
+    indexById[id] = positions[id].index;
+  }
+
+  return computeGridBandHeights(indexById, dimensions, orientation, itemsCount);
+}
+
+/**
+ * Y offset of a band, summing the variable heights of all preceding bands.
+ */
+export function getGridBandTop(
+  band: number,
+  bandHeights: number[],
+  rowGap: number
+): number {
+  "worklet";
+
+  let top = 0;
+  for (let b = 0; b < band && b < bandHeights.length; b++) {
+    top += bandHeights[b] + rowGap;
+  }
+  return top;
+}
+
+/**
+ * Band containing y. The rowGap below a band belongs to it, matching the
+ * uniform `floor(y / (itemHeight + rowGap))` behavior.
+ */
+export function getGridBandFromY(
+  y: number,
+  bandHeights: number[],
+  rowGap: number
+): number {
+  "worklet";
+
+  if (bandHeights.length === 0) {
+    return 0;
+  }
+
+  let top = 0;
+  for (let band = 0; band < bandHeights.length; band++) {
+    const bandEnd = top + bandHeights[band] + rowGap;
+    if (y < bandEnd || band === bandHeights.length - 1) {
+      return band;
+    }
+    top = bandEnd;
+  }
+  return bandHeights.length - 1;
+}
+
+/**
  * Calculate grid position from linear index
  */
 export function calculateGridPosition(
   index: number,
   dimensions: GridDimensions,
-  orientation: GridOrientation
+  orientation: GridOrientation,
+  bandHeights?: number[]
 ): GridPosition {
   "worklet";
 
@@ -42,7 +173,9 @@ export function calculateGridPosition(
   }
 
   const x = column * (itemWidth + columnGap);
-  const y = row * (itemHeight + rowGap);
+  const y = bandHeights
+    ? getGridBandTop(row, bandHeights, rowGap)
+    : row * (itemHeight + rowGap);
 
   return {
     index,
@@ -81,11 +214,26 @@ export function listToGridObject<T extends SortableData>(
   dimensions: GridDimensions,
   orientation: GridOrientation
 ): GridPositions {
-  const positions: GridPositions = {};
-
+  const indexById: { [id: string]: number } = {};
   for (let i = 0; i < list.length; i++) {
-    const position = calculateGridPosition(i, dimensions, orientation);
-    positions[list[i].id] = position;
+    indexById[list[i].id] = i;
+  }
+
+  const bandHeights = computeGridBandHeights(
+    indexById,
+    dimensions,
+    orientation,
+    list.length
+  );
+
+  const positions: GridPositions = {};
+  for (let i = 0; i < list.length; i++) {
+    positions[list[i].id] = calculateGridPosition(
+      i,
+      dimensions,
+      orientation,
+      bandHeights
+    );
   }
 
   return positions;
@@ -107,13 +255,12 @@ export function getGridCellFromCoordinates(
   y: number,
   dimensions: GridDimensions,
   orientation: GridOrientation,
-  totalItems: number
+  totalItems: number,
+  bandHeights?: number[]
 ): { row: number; column: number; index: number } {
   "worklet";
 
   const {
-    columns = 3,
-    rows = 3,
     itemWidth,
     itemHeight,
     rowGap = 0,
@@ -122,7 +269,9 @@ export function getGridCellFromCoordinates(
 
   // Calculate which column and row the coordinates fall into
   const column = Math.floor(x / (itemWidth + columnGap));
-  const row = Math.floor(y / (itemHeight + rowGap));
+  const row = bandHeights
+    ? getGridBandFromY(y, bandHeights, rowGap)
+    : Math.floor(y / (itemHeight + rowGap));
 
   // Calculate the linear index
   const index = calculateIndexFromRowColumn(row, column, dimensions, orientation);
@@ -132,7 +281,8 @@ export function getGridCellFromCoordinates(
   const clampedPosition = calculateGridPosition(
     clampedIndex,
     dimensions,
-    orientation
+    orientation,
+    bandHeights
   );
 
   return {
@@ -143,8 +293,9 @@ export function getGridCellFromCoordinates(
 }
 
 /**
- * Reorder grid positions using insert strategy
- * Items between source and target shift by one position
+ * Reorder grid positions using insert strategy.
+ * Slot indices shift first, then all items are re-laid out against band
+ * heights derived from the NEW assignment.
  */
 export function reorderGridInsert(
   positions: GridPositions,
@@ -155,8 +306,10 @@ export function reorderGridInsert(
 ): GridPositions {
   "worklet";
 
-  const newPositions: GridPositions = {};
   const activePosition = positions[activeId];
+  if (!activePosition) {
+    return positions;
+  }
   const fromIndex = activePosition.index;
 
   if (fromIndex === targetIndex) {
@@ -166,42 +319,50 @@ export function reorderGridInsert(
   const movingUp = targetIndex < fromIndex;
 
   // Reassign positions
+  let itemsCount = 0;
+  const indexById: { [id: string]: number } = {};
   for (const id in positions) {
     const currentIndex = positions[id].index;
 
     if (id === activeId) {
       // Move the active item to target
-      newPositions[id] = calculateGridPosition(
-        targetIndex,
-        dimensions,
-        orientation
-      );
+      indexById[id] = targetIndex;
     } else if (movingUp && currentIndex >= targetIndex && currentIndex < fromIndex) {
       // Shift items down (increase index by 1)
-      newPositions[id] = calculateGridPosition(
-        currentIndex + 1,
-        dimensions,
-        orientation
-      );
+      indexById[id] = currentIndex + 1;
     } else if (!movingUp && currentIndex <= targetIndex && currentIndex > fromIndex) {
       // Shift items up (decrease index by 1)
-      newPositions[id] = calculateGridPosition(
-        currentIndex - 1,
-        dimensions,
-        orientation
-      );
+      indexById[id] = currentIndex - 1;
     } else {
       // Keep the same position
-      newPositions[id] = positions[id];
+      indexById[id] = currentIndex;
     }
+    itemsCount++;
+  }
+
+  const bandHeights = computeGridBandHeights(
+    indexById,
+    dimensions,
+    orientation,
+    itemsCount
+  );
+
+  const newPositions: GridPositions = {};
+  for (const id in indexById) {
+    newPositions[id] = calculateGridPosition(
+      indexById[id],
+      dimensions,
+      orientation,
+      bandHeights
+    );
   }
 
   return newPositions;
 }
 
 /**
- * Reorder grid positions using swap strategy
- * Direct exchange between two items
+ * Reorder grid positions using swap strategy.
+ * Band heights are recomputed after the exchange since items change rows.
  */
 export function reorderGridSwap(
   positions: GridPositions,
@@ -212,19 +373,50 @@ export function reorderGridSwap(
 ): GridPositions {
   "worklet";
 
-  const newPositions: GridPositions = { ...positions };
   const activePosition = positions[activeId];
   const targetPosition = positions[targetId];
+  if (!activePosition || !targetPosition) {
+    return positions;
+  }
 
-  // Swap the two positions
-  newPositions[activeId] = targetPosition;
-  newPositions[targetId] = activePosition;
+  const activeIndex = activePosition.index;
+  const targetIndex = targetPosition.index;
+  if (activeIndex === targetIndex) {
+    return positions;
+  }
+
+  let itemsCount = 0;
+  const indexById: { [id: string]: number } = {};
+  for (const id in positions) {
+    indexById[id] = positions[id].index;
+    itemsCount++;
+  }
+  indexById[activeId] = targetIndex;
+  indexById[targetId] = activeIndex;
+
+  const bandHeights = computeGridBandHeights(
+    indexById,
+    dimensions,
+    orientation,
+    itemsCount
+  );
+
+  const newPositions: GridPositions = {};
+  for (const id in indexById) {
+    newPositions[id] = calculateGridPosition(
+      indexById[id],
+      dimensions,
+      orientation,
+      bandHeights
+    );
+  }
 
   return newPositions;
 }
 
 /**
- * Update grid positions based on drag position
+ * Update grid positions based on drag position.
+ * Hit testing uses pre-reorder band geometry; reordering re-lays out.
  */
 export function setGridPosition(
   x: number,
@@ -244,13 +436,21 @@ export function setGridPosition(
   const adjustedX = x + scrollX;
   const adjustedY = y + scrollY;
 
+  const bandHeights = computeGridBands(
+    positions.value,
+    dimensions,
+    orientation,
+    itemsCount
+  );
+
   // Get target cell
   const targetCell = getGridCellFromCoordinates(
     adjustedX,
     adjustedY,
     dimensions,
     orientation,
-    itemsCount
+    itemsCount,
+    bandHeights
   );
 
   const currentIndex = positions.value[id].index;
@@ -294,7 +494,8 @@ export function setGridPosition(
 export function calculateGridContentDimensions(
   itemsCount: number,
   dimensions: GridDimensions,
-  orientation: GridOrientation
+  orientation: GridOrientation,
+  bandHeights?: number[]
 ): { width: number; height: number } {
   "worklet";
 
@@ -311,15 +512,30 @@ export function calculateGridContentDimensions(
     // Calculate number of rows needed
     const totalRows = Math.ceil(itemsCount / columns);
     const width = columns * itemWidth + (columns - 1) * columnGap;
-    const height = totalRows * itemHeight + (totalRows - 1) * rowGap;
+    const height =
+      bandHeights && bandHeights.length > 0
+        ? sumBandHeights(bandHeights) + (bandHeights.length - 1) * rowGap
+        : totalRows * itemHeight + (totalRows - 1) * rowGap;
     return { width, height };
   } else {
     // Calculate number of columns needed
     const totalColumns = Math.ceil(itemsCount / rows);
     const width = totalColumns * itemWidth + (totalColumns - 1) * columnGap;
-    const height = rows * itemHeight + (rows - 1) * rowGap;
+    const height =
+      bandHeights && bandHeights.length > 0
+        ? sumBandHeights(bandHeights) + (bandHeights.length - 1) * rowGap
+        : rows * itemHeight + (rows - 1) * rowGap;
     return { width, height };
   }
+}
+
+function sumBandHeights(bandHeights: number[]): number {
+  "worklet";
+  let total = 0;
+  for (let i = 0; i < bandHeights.length; i++) {
+    total += bandHeights[i];
+  }
+  return total;
 }
 
 /**

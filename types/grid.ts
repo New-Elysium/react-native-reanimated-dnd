@@ -43,9 +43,15 @@ export interface GridDimensions {
   columns?: number;
   rows?: number;
   itemWidth: number;
+  /** Fallback slot height for items without an entry in `itemHeights` */
   itemHeight: number;
   rowGap?: number;
   columnGap?: number;
+  /**
+   * Per-item heights keyed by item id. Each row band sizes to its tallest
+   * item so variable-height items never overlap.
+   */
+  itemHeights?: { [itemId: string]: number };
 }
 
 /**

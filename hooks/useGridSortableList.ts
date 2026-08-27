@@ -18,6 +18,7 @@ import { DropProviderRef } from "../types/context";
 import {
   listToGridObject,
   calculateGridContentDimensions,
+  computeGridBandHeights,
 } from "../utils/gridCalculations";
 
 /**
@@ -79,6 +80,7 @@ export function useGridSortableList<TData extends SortableData>(
     dimensions.itemHeight,
     dimensions.rowGap,
     dimensions.columnGap,
+    dimensions.itemHeights,
     orientation,
   ]);
 
@@ -119,9 +121,19 @@ export function useGridSortableList<TData extends SortableData>(
     }, 50);
   }, []);
 
-  // Calculate content dimensions
+  // Calculate content dimensions (band-aware for variable item heights)
+  const layoutIndexById: { [id: string]: number } = {};
+  data.forEach((item, index) => {
+    layoutIndexById[itemKeyExtractor(item, index)] = index;
+  });
+  const layoutBandHeights = computeGridBandHeights(
+    layoutIndexById,
+    dimensions,
+    orientation,
+    data.length
+  );
   const { width: contentWidth, height: contentHeight } =
-    calculateGridContentDimensions(data.length, dimensions, orientation);
+    calculateGridContentDimensions(data.length, dimensions, orientation, layoutBandHeights);
 
   // Helper to get props for each grid item
   const getItemProps = useCallback(

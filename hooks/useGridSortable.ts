@@ -14,7 +14,6 @@ import {
   GridScrollDirection,
   GridPositions,
   GridDimensions,
-  GridOrientation,
   GridStrategy,
   UseGridSortableOptions,
   UseGridSortableReturn,
@@ -23,6 +22,9 @@ import {
   setGridPosition,
   setGridAutoScroll,
   calculateGridContentDimensions,
+  computeGridBands,
+  getGridCellFromCoordinates,
+  getGridItemHeight,
 } from "../utils/gridCalculations";
 
 /**
@@ -114,21 +116,23 @@ export function useGridSortable<T>(
         return;
       }
 
-      // Calculate target cell for hit detection
-      const { itemWidth, itemHeight, columnGap = 0, rowGap = 0, columns = 3 } = dimensions;
-      const clampedColumn = Math.min(
-        Math.max(0, Math.round(current.x / (itemWidth + columnGap))),
-        (orientation === GridOrientation.Vertical ? columns : Infinity) - 1
+      // Calculate target cell for hit detection (band-aware for variable
+      // heights, scroll-adjusted to match setGridPosition)
+      const bandHeights = computeGridBands(
+        positions.value,
+        dimensions,
+        orientation,
+        itemsCount
       );
-      const clampedRow = Math.floor(current.y / (itemHeight + rowGap));
-      let targetIndex: number;
-      if (orientation === GridOrientation.Vertical) {
-        targetIndex = clampedRow * columns + clampedColumn;
-      } else {
-        const rows = dimensions.rows ?? 3;
-        targetIndex = clampedColumn * rows + clampedRow;
-      }
-      targetIndex = Math.max(0, Math.min(targetIndex, itemsCount - 1));
+      const targetCell = getGridCellFromCoordinates(
+        current.x + scrollX.value,
+        current.y + scrollY.value,
+        dimensions,
+        orientation,
+        itemsCount,
+        bandHeights
+      );
+      const targetIndex = targetCell.index;
 
       // Determine overItemId
       let newOverItemId: string | null = null;
@@ -239,8 +243,14 @@ export function useGridSortable<T>(
         previousValue !== null &&
         scrollDirection !== previousValue
       ) {
+        const bandHeights = computeGridBands(
+          positions.value,
+          dimensions,
+          orientation,
+          itemsCount
+        );
         const { width: contentWidth, height: contentHeight } =
-          calculateGridContentDimensions(itemsCount, dimensions, orientation);
+          calculateGridContentDimensions(itemsCount, dimensions, orientation, bandHeights);
 
         const maxScrollY = Math.max(0, contentHeight - calculatedContainerHeight);
         const maxScrollX = Math.max(0, contentWidth - calculatedContainerWidth);
@@ -381,7 +391,7 @@ export function useGridSortable<T>(
         top: topValue.value,
         left: leftValue.value,
         width: dimensions.itemWidth,
-        height: dimensions.itemHeight,
+        height: getGridItemHeight(id, dimensions),
         zIndex: 0,
         opacity: withTiming(0, { duration: 250 }),
         transform: [{ scale: withTiming(0.5, { duration: 250 }) }],
@@ -393,7 +403,7 @@ export function useGridSortable<T>(
       top: topValue.value,
       left: leftValue.value,
       width: dimensions.itemWidth,
-      height: dimensions.itemHeight,
+      height: getGridItemHeight(id, dimensions),
       zIndex: movingSV.value ? 1000 : 0,
       shadowColor: "black",
       shadowOpacity: withSpring(movingSV.value ? 0.2 : 0),
