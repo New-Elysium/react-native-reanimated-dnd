@@ -47,6 +47,43 @@ export function getGridItemRowSpan(
 }
 
 /**
+ * Column span for an item (vertical orientation). Anything below 2 is a
+ * normal single-column item.
+ */
+export function getGridItemColumnSpan(
+  itemId: string,
+  dimensions: GridDimensions
+): number {
+  "worklet";
+
+  const customSpan = dimensions.itemColumnSpans
+    ? dimensions.itemColumnSpans[itemId]
+    : undefined;
+
+  return customSpan !== undefined && customSpan > 1
+    ? Math.floor(customSpan)
+    : 1;
+}
+
+/**
+ * Rendered width of an item. Column-span items stretch to the summed width
+ * of the columns they cover (plus gaps); other items keep `itemWidth`.
+ */
+export function getGridItemSpanWidth(
+  itemId: string,
+  dimensions: GridDimensions
+): number {
+  "worklet";
+
+  const span = getGridItemColumnSpan(itemId, dimensions);
+  if (span <= 1) {
+    return dimensions.itemWidth;
+  }
+
+  return span * dimensions.itemWidth + (span - 1) * (dimensions.columnGap ?? 0);
+}
+
+/**
  * Rendered height of an item. Spanning items stretch to the summed height of
  * the bands they cover (plus gaps); other items keep their own height.
  */
@@ -77,11 +114,11 @@ export function getGridItemSpanHeight(
 }
 
 /**
- * Pack items into cells. Spanning items anchor to the top row of their
+ * Pack items into cells. Row-span items anchor to the top row of their
  * column (sequence slot picks the column, taken footprints scan right) so
- * nothing ever sits above them; single-row items then fill the remaining
- * cells row-major. Without spans this is identical to sequential index
- * arithmetic.
+ * nothing ever sits above them. Column-span items claim adjacent cells in
+ * one row, wrapping when they do not fit. Remaining items fill the cells
+ * row-major. Without spans this is identical to sequential index arithmetic.
  */
 export function packGridCells(
   orderedIds: string[],
@@ -105,40 +142,55 @@ export function packGridCells(
   if (orientation === GridOrientation.Vertical) {
     const occupied: { [key: string]: boolean } = {};
     const key = (r: number, c: number) => r + ":" + c;
-    const fitsAt = (r: number, c: number, span: number) => {
-      for (let rr = r; rr < r + span; rr++) {
-        if (occupied[key(rr, c)]) {
-          return false;
+    const fitsAt = (
+      r: number,
+      c: number,
+      rowSpan: number,
+      colSpan: number
+    ) => {
+      for (let rr = r; rr < r + rowSpan; rr++) {
+        for (let cc = c; cc < c + colSpan; cc++) {
+          if (occupied[key(rr, cc)]) {
+            return false;
+          }
         }
       }
       return true;
     };
-    const claim = (id: string, row: number, column: number, span: number) => {
-      for (let rr = row; rr < row + span; rr++) {
-        occupied[key(rr, column)] = true;
+    const claim = (
+      id: string,
+      row: number,
+      column: number,
+      rowSpan: number,
+      colSpan: number
+    ) => {
+      for (let rr = row; rr < row + rowSpan; rr++) {
+        for (let cc = column; cc < column + colSpan; cc++) {
+          occupied[key(rr, cc)] = true;
+        }
       }
       indexById[id] = row * columns + column;
       rowById[id] = row;
       columnById[id] = column;
-      if (row + span > rowsUsed) {
-        rowsUsed = row + span;
+      if (row + rowSpan > rowsUsed) {
+        rowsUsed = row + rowSpan;
       }
     };
 
-    // Pass 1 — spanning items anchor to row 0. The implied column comes from
+    // Pass 1 — row-span items anchor to row 0. The implied column comes from
     // the sequence slot so dragging a span between columns keeps working; if
     // that footprint is taken, scan right for the next free column.
     for (let i = 0; i < orderedIds.length; i++) {
       const id = orderedIds[i];
-      const span = getGridItemRowSpan(id, dimensions);
-      if (span <= 1) {
+      const rowSpan = getGridItemRowSpan(id, dimensions);
+      if (rowSpan <= 1) {
         continue;
       }
       let placed = false;
       for (let attempt = 0; attempt < columns && !placed; attempt++) {
         const column = (i + attempt) % columns;
-        if (fitsAt(0, column, span)) {
-          claim(id, 0, column, span);
+        if (fitsAt(0, column, rowSpan, 1)) {
+          claim(id, 0, column, rowSpan, 1);
           placed = true;
         }
       }
@@ -147,37 +199,39 @@ export function packGridCells(
         // first cell whose full footprint is free.
         let scanRow = 0;
         let scanColumn = 0;
-        while (!fitsAt(scanRow, scanColumn, span)) {
+        while (!fitsAt(scanRow, scanColumn, rowSpan, 1)) {
           scanColumn++;
           if (scanColumn >= columns) {
             scanColumn = 0;
             scanRow++;
           }
         }
-        claim(id, scanRow, scanColumn, span);
+        claim(id, scanRow, scanColumn, rowSpan, 1);
       }
     }
 
-    // Pass 2 — single-row items fill the remaining cells row-major.
-    let scanRow = 0;
-    let scanColumn = 0;
+    // Pass 2 — remaining items fill cells row-major. Column-span items claim
+    // adjacent cells in the same row, wrapping to the next row when they do
+    // not fit before the row ends.
     for (let i = 0; i < orderedIds.length; i++) {
       const id = orderedIds[i];
       if (indexById[id] !== undefined) {
         continue;
       }
-      while (occupied[key(scanRow, scanColumn)]) {
-        scanColumn++;
-        if (scanColumn >= columns) {
+      const colSpan = Math.min(getGridItemColumnSpan(id, dimensions), columns);
+      let scanRow = 0;
+      let scanColumn = 0;
+      for (;;) {
+        if (scanColumn + colSpan > columns) {
           scanColumn = 0;
           scanRow++;
+          continue;
         }
-      }
-      claim(id, scanRow, scanColumn, 1);
-      scanColumn++;
-      if (scanColumn >= columns) {
-        scanColumn = 0;
-        scanRow++;
+        if (fitsAt(scanRow, scanColumn, 1, colSpan)) {
+          claim(id, scanRow, scanColumn, 1, colSpan);
+          break;
+        }
+        scanColumn++;
       }
     }
   } else {
@@ -198,7 +252,7 @@ export function packGridCells(
 }
 
 /**
- * Find the item whose footprint (including spanned cells) covers a cell.
+ * Find the item whose footprint (including row/column spans) covers a cell.
  */
 export function findItemIdAtCell(
   positions: GridPositions,
@@ -212,14 +266,14 @@ export function findItemIdAtCell(
   let best: string | null = null;
   for (const id in positions) {
     const position = positions[id];
-    const span =
-      orientation === GridOrientation.Vertical
-        ? getGridItemRowSpan(id, dimensions)
-        : 1;
+    const vertical = orientation === GridOrientation.Vertical;
+    const rowSpan = vertical ? getGridItemRowSpan(id, dimensions) : 1;
+    const colSpan = vertical ? getGridItemColumnSpan(id, dimensions) : 1;
     if (
-      position.column === column &&
+      column >= position.column &&
+      column < position.column + colSpan &&
       row >= position.row &&
-      row < position.row + span
+      row < position.row + rowSpan
     ) {
       if (best === null || position.index < positions[best].index) {
         best = id;

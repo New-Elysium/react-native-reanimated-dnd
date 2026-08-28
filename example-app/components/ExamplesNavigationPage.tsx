@@ -70,6 +70,13 @@ const categories: Category[] = [
         icon: `⬒${TEXT}`,
       },
       {
+        id: "dynamicWidthGrid",
+        title: "Dynamic Width Grid",
+        description: "Grid with items spanning two columns",
+        component: "DynamicWidthGridExample",
+        icon: `⬓${TEXT}`,
+      },
+      {
         id: "kanbanBoard",
         title: "Kanban Board",
         description: "Reorder cards across auto-scrolling columns",

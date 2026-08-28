@@ -25,6 +25,7 @@ import {
   computeGridBands,
   getGridCellFromCoordinates,
   getGridItemSpanHeight,
+  getGridItemSpanWidth,
   findItemIdAtCell,
 } from "../utils/gridCalculations";
 
@@ -410,7 +411,7 @@ export function useGridSortable<T>(
         position: "absolute",
         top: topValue.value,
         left: leftValue.value,
-        width: dimensions.itemWidth,
+        width: getGridItemSpanWidth(id, dimensions),
         height,
         zIndex: 0,
         opacity: withTiming(0, { duration: 250 }),
@@ -422,7 +423,7 @@ export function useGridSortable<T>(
       position: "absolute",
       top: topValue.value,
       left: leftValue.value,
-      width: dimensions.itemWidth,
+      width: getGridItemSpanWidth(id, dimensions),
       height,
       zIndex: movingSV.value ? 1000 : 0,
       shadowColor: "black",

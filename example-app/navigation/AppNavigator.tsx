@@ -23,6 +23,7 @@ import {
   CustomDraggableExample,
   DynamicHeightExample,
   DynamicGridExample,
+  DynamicWidthGridExample,
   KanbanBoardExample,
 } from "@/components/examples";
 import { HorizontalSortableExample } from "@/components/HorizontalSortableExample";
@@ -50,6 +51,7 @@ export type RootStackParamList = {
   GridSortableExample: undefined;
   DynamicHeightExample: undefined;
   DynamicGridExample: undefined;
+  DynamicWidthGridExample: undefined;
   KanbanBoardExample: undefined;
 };
 
@@ -182,6 +184,12 @@ function DynamicGridExampleScreen({
   return <DynamicGridExample onBack={() => navigation.goBack()} />;
 }
 
+function DynamicWidthGridExampleScreen({
+  navigation,
+}: StackScreenProps<RootStackParamList, "DynamicWidthGridExample">) {
+  return <DynamicWidthGridExample onBack={() => navigation.goBack()} />;
+}
+
 function KanbanBoardExampleScreen({
   navigation,
 }: StackScreenProps<RootStackParamList, "KanbanBoardExample">) {
@@ -276,6 +284,10 @@ export function AppNavigator() {
         <Stack.Screen
           name="DynamicGridExample"
           component={DynamicGridExampleScreen}
+        />
+        <Stack.Screen
+          name="DynamicWidthGridExample"
+          component={DynamicWidthGridExampleScreen}
         />
         <Stack.Screen
           name="KanbanBoardExample"

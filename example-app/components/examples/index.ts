@@ -14,4 +14,5 @@ export { CapacityExample } from "./CapacityExample";
 export { CustomDraggableExample } from "./CustomDraggableExample";
 export { DynamicHeightExample } from "./DynamicHeightExample";
 export { DynamicGridExample } from "./DynamicGridExample";
+export { DynamicWidthGridExample } from "./DynamicWidthGridExample";
 export { KanbanBoardExample } from "./KanbanBoardExample";

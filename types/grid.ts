@@ -58,6 +58,13 @@ export interface GridDimensions {
    * height of those rows; remaining items pack around it.
    */
   itemRowSpans?: { [itemId: string]: number };
+  /**
+   * Per-item column spans keyed by item id (vertical orientation only). A
+   * span N item occupies N adjacent columns in one row and stretches to the
+   * full width of those columns; remaining items pack around it. Ignored for
+   * items that also declare a row span.
+   */
+  itemColumnSpans?: { [itemId: string]: number };
 }
 
 /**
