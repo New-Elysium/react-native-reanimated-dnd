@@ -305,7 +305,11 @@ export function computeGridBandHeights(
     bandCount = 0;
     for (const id in indexById) {
       const index = indexById[id];
-      if (index < 0 || index >= itemsCount) {
+      // Only excluded items (index -1) are ignored. Span layouts legitimately
+      // produce indices >= itemsCount when packing pushes items past the
+      // list-depth boundary, and those rows must still count toward the
+      // band count.
+      if (index < 0) {
         continue;
       }
       const bandEnd =
@@ -328,7 +332,7 @@ export function computeGridBandHeights(
 
   for (const id in indexById) {
     const index = indexById[id];
-    if (index < 0 || index >= itemsCount) {
+    if (index < 0) {
       continue;
     }
     // Spanning items derive their height from the bands, never the reverse.
