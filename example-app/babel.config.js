@@ -15,8 +15,6 @@ module.exports = function (api) {
           },
         },
       ],
-      ["@babel/plugin-transform-typescript", { isTSX: true }],
-      ["@babel/plugin-transform-class-properties", { loose: true, legacy: true }],
       "@babel/plugin-proposal-export-namespace-from",
       "react-native-worklets/plugin",
     ],
