@@ -28,9 +28,213 @@ export function getGridItemHeight(
 }
 
 /**
+ * Row span for an item (vertical orientation). Anything below 2 is a normal
+ * single-row item.
+ */
+export function getGridItemRowSpan(
+  itemId: string,
+  dimensions: GridDimensions
+): number {
+  "worklet";
+
+  const customSpan = dimensions.itemRowSpans
+    ? dimensions.itemRowSpans[itemId]
+    : undefined;
+
+  return customSpan !== undefined && customSpan > 1
+    ? Math.floor(customSpan)
+    : 1;
+}
+
+/**
+ * Rendered height of an item. Spanning items stretch to the summed height of
+ * the bands they cover (plus gaps); other items keep their own height.
+ */
+export function getGridItemSpanHeight(
+  itemId: string,
+  row: number,
+  bandHeights: number[],
+  rowGap: number,
+  dimensions: GridDimensions
+): number {
+  "worklet";
+
+  const span = getGridItemRowSpan(itemId, dimensions);
+  if (span <= 1 || bandHeights.length === 0) {
+    return getGridItemHeight(itemId, dimensions);
+  }
+
+  let total = 0;
+  let bands = 0;
+  for (let b = row; b < row + span && b < bandHeights.length; b++) {
+    total += bandHeights[b];
+    bands++;
+  }
+
+  return bands > 0
+    ? total + (bands - 1) * rowGap
+    : getGridItemHeight(itemId, dimensions);
+}
+
+/**
+ * Pack items into cells. Spanning items anchor to the top row of their
+ * column (sequence slot picks the column, taken footprints scan right) so
+ * nothing ever sits above them; single-row items then fill the remaining
+ * cells row-major. Without spans this is identical to sequential index
+ * arithmetic.
+ */
+export function packGridCells(
+  orderedIds: string[],
+  dimensions: GridDimensions,
+  orientation: GridOrientation,
+  itemsCount: number
+): {
+  indexById: { [id: string]: number };
+  rowById: { [id: string]: number };
+  columnById: { [id: string]: number };
+  rowsUsed: number;
+} {
+  "worklet";
+
+  const { columns = 3, rows = 3 } = dimensions;
+  const indexById: { [id: string]: number } = {};
+  const rowById: { [id: string]: number } = {};
+  const columnById: { [id: string]: number } = {};
+  let rowsUsed = 0;
+
+  if (orientation === GridOrientation.Vertical) {
+    const occupied: { [key: string]: boolean } = {};
+    const key = (r: number, c: number) => r + ":" + c;
+    const fitsAt = (r: number, c: number, span: number) => {
+      for (let rr = r; rr < r + span; rr++) {
+        if (occupied[key(rr, c)]) {
+          return false;
+        }
+      }
+      return true;
+    };
+    const claim = (id: string, row: number, column: number, span: number) => {
+      for (let rr = row; rr < row + span; rr++) {
+        occupied[key(rr, column)] = true;
+      }
+      indexById[id] = row * columns + column;
+      rowById[id] = row;
+      columnById[id] = column;
+      if (row + span > rowsUsed) {
+        rowsUsed = row + span;
+      }
+    };
+
+    // Pass 1 — spanning items anchor to row 0. The implied column comes from
+    // the sequence slot so dragging a span between columns keeps working; if
+    // that footprint is taken, scan right for the next free column.
+    for (let i = 0; i < orderedIds.length; i++) {
+      const id = orderedIds[i];
+      const span = getGridItemRowSpan(id, dimensions);
+      if (span <= 1) {
+        continue;
+      }
+      let placed = false;
+      for (let attempt = 0; attempt < columns && !placed; attempt++) {
+        const column = (i + attempt) % columns;
+        if (fitsAt(0, column, span)) {
+          claim(id, 0, column, span);
+          placed = true;
+        }
+      }
+      if (!placed) {
+        // Degenerate (more spanning items than columns): fall back to the
+        // first cell whose full footprint is free.
+        let scanRow = 0;
+        let scanColumn = 0;
+        while (!fitsAt(scanRow, scanColumn, span)) {
+          scanColumn++;
+          if (scanColumn >= columns) {
+            scanColumn = 0;
+            scanRow++;
+          }
+        }
+        claim(id, scanRow, scanColumn, span);
+      }
+    }
+
+    // Pass 2 — single-row items fill the remaining cells row-major.
+    let scanRow = 0;
+    let scanColumn = 0;
+    for (let i = 0; i < orderedIds.length; i++) {
+      const id = orderedIds[i];
+      if (indexById[id] !== undefined) {
+        continue;
+      }
+      while (occupied[key(scanRow, scanColumn)]) {
+        scanColumn++;
+        if (scanColumn >= columns) {
+          scanColumn = 0;
+          scanRow++;
+        }
+      }
+      claim(id, scanRow, scanColumn, 1);
+      scanColumn++;
+      if (scanColumn >= columns) {
+        scanColumn = 0;
+        scanRow++;
+      }
+    }
+  } else {
+    // Horizontal grids flow column-major over fixed rows; row spans are a
+    // vertical-orientation feature and are ignored here.
+    for (let i = 0; i < orderedIds.length; i++) {
+      const id = orderedIds[i];
+      const column = Math.floor(i / rows);
+      const row = i % rows;
+      indexById[id] = column * rows + row;
+      rowById[id] = row;
+      columnById[id] = column;
+    }
+    rowsUsed = Math.min(rows, Math.max(itemsCount, 1));
+  }
+
+  return { indexById, rowById, columnById, rowsUsed };
+}
+
+/**
+ * Find the item whose footprint (including spanned cells) covers a cell.
+ */
+export function findItemIdAtCell(
+  positions: GridPositions,
+  row: number,
+  column: number,
+  dimensions: GridDimensions,
+  orientation: GridOrientation
+): string | null {
+  "worklet";
+
+  let best: string | null = null;
+  for (const id in positions) {
+    const position = positions[id];
+    const span =
+      orientation === GridOrientation.Vertical
+        ? getGridItemRowSpan(id, dimensions)
+        : 1;
+    if (
+      position.column === column &&
+      row >= position.row &&
+      row < position.row + span
+    ) {
+      if (best === null || position.index < positions[best].index) {
+        best = id;
+      }
+    }
+  }
+  return best;
+}
+
+/**
  * Row-band heights for an id -> index assignment: each band (vertical:
  * floor(index / columns), horizontal: index % rows) is sized to its tallest
- * item. Single source of truth for variable-height geometry.
+ * item. Single source of truth for variable-height geometry. Spanning items
+ * do not inflate bands — they stretch to the bands they cover instead. The
+ * vertical band count extends to cover any span that crosses the last row.
  */
 export function computeGridBandHeights(
   indexById: { [id: string]: number },
@@ -42,10 +246,26 @@ export function computeGridBandHeights(
 
   const { columns = 3, rows = 3, itemHeight } = dimensions;
 
-  const bandCount =
-    orientation === GridOrientation.Vertical
-      ? Math.ceil(itemsCount / columns)
-      : rows;
+  let bandCount: number;
+  if (orientation === GridOrientation.Vertical) {
+    bandCount = 0;
+    for (const id in indexById) {
+      const index = indexById[id];
+      if (index < 0 || index >= itemsCount) {
+        continue;
+      }
+      const bandEnd =
+        Math.floor(index / columns) + getGridItemRowSpan(id, dimensions);
+      if (bandEnd > bandCount) {
+        bandCount = bandEnd;
+      }
+    }
+    if (bandCount === 0 && itemsCount > 0) {
+      bandCount = Math.ceil(itemsCount / columns);
+    }
+  } else {
+    bandCount = rows;
+  }
 
   const bandHeights: number[] = [];
   for (let band = 0; band < bandCount; band++) {
@@ -55,6 +275,13 @@ export function computeGridBandHeights(
   for (const id in indexById) {
     const index = indexById[id];
     if (index < 0 || index >= itemsCount) {
+      continue;
+    }
+    // Spanning items derive their height from the bands, never the reverse.
+    if (
+      orientation === GridOrientation.Vertical &&
+      getGridItemRowSpan(id, dimensions) > 1
+    ) {
       continue;
     }
     const band =
@@ -207,6 +434,48 @@ export function calculateIndexFromRowColumn(
 }
 
 /**
+ * Layout a sequence of item ids: pack into cells, size bands, compute x/y.
+ */
+function layoutGridSequence(
+  orderedIds: string[],
+  dimensions: GridDimensions,
+  orientation: GridOrientation
+): GridPositions {
+  "worklet";
+
+  const packed = packGridCells(
+    orderedIds,
+    dimensions,
+    orientation,
+    orderedIds.length
+  );
+  const bandHeights = computeGridBandHeights(
+    packed.indexById,
+    dimensions,
+    orientation,
+    orderedIds.length
+  );
+  const rowGap = dimensions.rowGap ?? 0;
+  const columnStride = dimensions.itemWidth + (dimensions.columnGap ?? 0);
+
+  const positions: GridPositions = {};
+  for (let i = 0; i < orderedIds.length; i++) {
+    const id = orderedIds[i];
+    const row = packed.rowById[id];
+    const column = packed.columnById[id];
+    positions[id] = {
+      index: packed.indexById[id],
+      row,
+      column,
+      x: column * columnStride,
+      y: getGridBandTop(row, bandHeights, rowGap),
+    };
+  }
+
+  return positions;
+}
+
+/**
  * Convert data array to grid positions object
  */
 export function listToGridObject<T extends SortableData>(
@@ -214,29 +483,11 @@ export function listToGridObject<T extends SortableData>(
   dimensions: GridDimensions,
   orientation: GridOrientation
 ): GridPositions {
-  const indexById: { [id: string]: number } = {};
-  for (let i = 0; i < list.length; i++) {
-    indexById[list[i].id] = i;
-  }
-
-  const bandHeights = computeGridBandHeights(
-    indexById,
+  return layoutGridSequence(
+    list.map((item) => item.id),
     dimensions,
-    orientation,
-    list.length
+    orientation
   );
-
-  const positions: GridPositions = {};
-  for (let i = 0; i < list.length; i++) {
-    positions[list[i].id] = calculateGridPosition(
-      i,
-      dimensions,
-      orientation,
-      bandHeights
-    );
-  }
-
-  return positions;
 }
 
 /**
@@ -294,8 +545,8 @@ export function getGridCellFromCoordinates(
 
 /**
  * Reorder grid positions using insert strategy.
- * Slot indices shift first, then all items are re-laid out against band
- * heights derived from the NEW assignment.
+ * The active item is moved to the target slot in the visual sequence and the
+ * whole grid is re-packed, so spanning items always keep a valid footprint.
  */
 export function reorderGridInsert(
   positions: GridPositions,
@@ -316,53 +567,34 @@ export function reorderGridInsert(
     return positions;
   }
 
-  const movingUp = targetIndex < fromIndex;
-
-  // Reassign positions
-  let itemsCount = 0;
-  const indexById: { [id: string]: number } = {};
-  for (const id in positions) {
-    const currentIndex = positions[id].index;
-
-    if (id === activeId) {
-      // Move the active item to target
-      indexById[id] = targetIndex;
-    } else if (movingUp && currentIndex >= targetIndex && currentIndex < fromIndex) {
-      // Shift items down (increase index by 1)
-      indexById[id] = currentIndex + 1;
-    } else if (!movingUp && currentIndex <= targetIndex && currentIndex > fromIndex) {
-      // Shift items up (decrease index by 1)
-      indexById[id] = currentIndex - 1;
-    } else {
-      // Keep the same position
-      indexById[id] = currentIndex;
-    }
-    itemsCount++;
-  }
-
-  const bandHeights = computeGridBandHeights(
-    indexById,
-    dimensions,
-    orientation,
-    itemsCount
+  const sequence = Object.keys(positions).sort(
+    (a, b) => positions[a].index - positions[b].index
   );
-
-  const newPositions: GridPositions = {};
-  for (const id in indexById) {
-    newPositions[id] = calculateGridPosition(
-      indexById[id],
-      dimensions,
-      orientation,
-      bandHeights
-    );
+  const fromSeq = sequence.indexOf(activeId);
+  if (fromSeq === -1) {
+    return positions;
   }
+  sequence.splice(fromSeq, 1);
 
-  return newPositions;
+  const movingUp = targetIndex < fromIndex;
+  const targetSeq = sequence.findIndex(
+    (id) => positions[id].index === targetIndex
+  );
+  let insertAt: number;
+  if (movingUp) {
+    insertAt = targetSeq === -1 ? 0 : targetSeq;
+  } else {
+    insertAt = targetSeq === -1 ? sequence.length : targetSeq + 1;
+  }
+  sequence.splice(insertAt, 0, activeId);
+
+  return layoutGridSequence(sequence, dimensions, orientation);
 }
 
 /**
  * Reorder grid positions using swap strategy.
- * Band heights are recomputed after the exchange since items change rows.
+ * The two items exchange places in the sequence and the grid is re-packed so
+ * spanning footprints stay valid.
  */
 export function reorderGridSwap(
   positions: GridPositions,
@@ -385,33 +617,18 @@ export function reorderGridSwap(
     return positions;
   }
 
-  let itemsCount = 0;
-  const indexById: { [id: string]: number } = {};
-  for (const id in positions) {
-    indexById[id] = positions[id].index;
-    itemsCount++;
-  }
-  indexById[activeId] = targetIndex;
-  indexById[targetId] = activeIndex;
-
-  const bandHeights = computeGridBandHeights(
-    indexById,
-    dimensions,
-    orientation,
-    itemsCount
+  const sequence = Object.keys(positions).sort(
+    (a, b) => positions[a].index - positions[b].index
   );
-
-  const newPositions: GridPositions = {};
-  for (const id in indexById) {
-    newPositions[id] = calculateGridPosition(
-      indexById[id],
-      dimensions,
-      orientation,
-      bandHeights
-    );
+  const activeSeq = sequence.indexOf(activeId);
+  const targetSeq = sequence.indexOf(targetId);
+  if (activeSeq === -1 || targetSeq === -1) {
+    return positions;
   }
+  sequence[activeSeq] = targetId;
+  sequence[targetSeq] = activeId;
 
-  return newPositions;
+  return layoutGridSequence(sequence, dimensions, orientation);
 }
 
 /**
@@ -459,21 +676,25 @@ export function setGridPosition(
     return;
   }
 
-  // Find the ID of the item at the target position
-  let targetId: string | null = null;
-  for (const itemId in positions.value) {
-    if (positions.value[itemId].index === targetCell.index) {
-      targetId = itemId;
-      break;
-    }
-  }
+  // Resolve the cell to the item whose footprint covers it — a spanned cell
+  // belongs to the item that claimed it, not to the raw cell index.
+  const targetId = findItemIdAtCell(
+    positions.value,
+    targetCell.row,
+    targetCell.column,
+    dimensions,
+    orientation
+  );
+  const targetIndex = targetId
+    ? positions.value[targetId].index
+    : targetCell.index;
 
   // Apply reordering strategy
   if (strategy === GridStrategy.Insert) {
     positions.value = reorderGridInsert(
       positions.value,
       id,
-      targetCell.index,
+      targetIndex,
       dimensions,
       orientation
     );

@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback, useEffect, useMemo } from "react";
 import {
   scrollTo,
   useAnimatedReaction,
@@ -18,7 +18,7 @@ import { DropProviderRef } from "../types/context";
 import {
   listToGridObject,
   calculateGridContentDimensions,
-  computeGridBandHeights,
+  computeGridBands,
 } from "../utils/gridCalculations";
 
 /**
@@ -56,10 +56,26 @@ export function useGridSortableList<TData extends SortableData>(
     });
   }
 
-  // Set up shared values
-  const positions = useSharedValue(
-    listToGridObject(data, dimensions, orientation)
+  // Packed layout (span-aware). Recomputed when data or dimensions change.
+  const layoutPositions = useMemo(
+    () => listToGridObject(data, dimensions, orientation),
+    [
+      data.length,
+      data.map((d) => itemKeyExtractor(d, 0)).join(","),
+      dimensions.columns,
+      dimensions.rows,
+      dimensions.itemWidth,
+      dimensions.itemHeight,
+      dimensions.rowGap,
+      dimensions.columnGap,
+      dimensions.itemHeights,
+      dimensions.itemRowSpans,
+      orientation,
+    ]
   );
+
+  // Set up shared values
+  const positions = useSharedValue(layoutPositions);
   const scrollY = useSharedValue(0);
   const scrollX = useSharedValue(0);
   const nativeScrollY = useSharedValue(0);
@@ -68,21 +84,10 @@ export function useGridSortableList<TData extends SortableData>(
   const scrollViewRef = useAnimatedRef();
   const dropProviderRef = useRef<DropProviderRef>(null);
 
-  // Update positions when data or dimensions change
+  // Update positions when the packed layout changes
   useEffect(() => {
-    positions.value = listToGridObject(data, dimensions, orientation);
-  }, [
-    data.length,
-    data.map((d) => itemKeyExtractor(d, 0)).join(","),
-    dimensions.columns,
-    dimensions.rows,
-    dimensions.itemWidth,
-    dimensions.itemHeight,
-    dimensions.rowGap,
-    dimensions.columnGap,
-    dimensions.itemHeights,
-    orientation,
-  ]);
+    positions.value = layoutPositions;
+  }, [layoutPositions, positions]);
 
   // Scrolling synchronization
   useAnimatedReaction(
@@ -121,19 +126,20 @@ export function useGridSortableList<TData extends SortableData>(
     }, 50);
   }, []);
 
-  // Calculate content dimensions (band-aware for variable item heights)
-  const layoutIndexById: { [id: string]: number } = {};
-  data.forEach((item, index) => {
-    layoutIndexById[itemKeyExtractor(item, index)] = index;
-  });
-  const layoutBandHeights = computeGridBandHeights(
-    layoutIndexById,
-    dimensions,
-    orientation,
-    data.length
+  // Calculate content dimensions (band-aware for variable item heights).
+  // Bands derive from the packed layout so spanning items extend them.
+  const layoutBandHeights = useMemo(
+    () =>
+      computeGridBands(layoutPositions, dimensions, orientation, data.length),
+    [layoutPositions, dimensions, orientation, data.length]
   );
   const { width: contentWidth, height: contentHeight } =
-    calculateGridContentDimensions(data.length, dimensions, orientation, layoutBandHeights);
+    calculateGridContentDimensions(
+      data.length,
+      dimensions,
+      orientation,
+      layoutBandHeights
+    );
 
   // Helper to get props for each grid item
   const getItemProps = useCallback(

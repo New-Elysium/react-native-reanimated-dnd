@@ -24,7 +24,8 @@ import {
   calculateGridContentDimensions,
   computeGridBands,
   getGridCellFromCoordinates,
-  getGridItemHeight,
+  getGridItemSpanHeight,
+  findItemIdAtCell,
 } from "../utils/gridCalculations";
 
 /**
@@ -132,16 +133,19 @@ export function useGridSortable<T>(
         itemsCount,
         bandHeights
       );
-      const targetIndex = targetCell.index;
 
-      // Determine overItemId
+      // Determine overItemId — resolve the cell to the item whose footprint
+      // covers it so spanned cells report the spanning item.
+      const owner = findItemIdAtCell(
+        positions.value,
+        targetCell.row,
+        targetCell.column,
+        dimensions,
+        orientation
+      );
       let newOverItemId: string | null = null;
-      const positionsValue = positions.value;
-      for (const itemId in positionsValue) {
-        if (positionsValue[itemId].index === targetIndex && itemId !== id) {
-          newOverItemId = itemId;
-          break;
-        }
+      if (owner !== null && owner !== id) {
+        newOverItemId = owner;
       }
 
       if (currentOverItemId.value !== newOverItemId) {
@@ -385,13 +389,29 @@ export function useGridSortable<T>(
   const animatedStyle = useAnimatedStyle(() => {
     "worklet";
 
+    // Spanning items stretch to the full height of the bands they cover.
+    const bands = computeGridBands(
+      positions.value,
+      dimensions,
+      orientation,
+      itemsCount
+    );
+    const row = positions.value[id]?.row ?? 0;
+    const height = getGridItemSpanHeight(
+      id,
+      row,
+      bands,
+      dimensions.rowGap ?? 0,
+      dimensions
+    );
+
     if (isBeingRemoved) {
       return {
         position: "absolute",
         top: topValue.value,
         left: leftValue.value,
         width: dimensions.itemWidth,
-        height: getGridItemHeight(id, dimensions),
+        height,
         zIndex: 0,
         opacity: withTiming(0, { duration: 250 }),
         transform: [{ scale: withTiming(0.5, { duration: 250 }) }],
@@ -403,7 +423,7 @@ export function useGridSortable<T>(
       top: topValue.value,
       left: leftValue.value,
       width: dimensions.itemWidth,
-      height: getGridItemHeight(id, dimensions),
+      height,
       zIndex: movingSV.value ? 1000 : 0,
       shadowColor: "black",
       shadowOpacity: withSpring(movingSV.value ? 0.2 : 0),

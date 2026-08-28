@@ -4,10 +4,13 @@ import {
   calculateGridPosition,
   calculateGridContentDimensions,
   computeGridBands,
+  findItemIdAtCell,
   getGridBandFromY,
   getGridBandTop,
   getGridCellFromCoordinates,
   getGridItemHeight,
+  getGridItemRowSpan,
+  getGridItemSpanHeight,
   listToGridObject,
   reorderGridInsert,
   reorderGridSwap,
@@ -262,6 +265,176 @@ test("item height helpers", () => {
   assert.strictEqual(getGridItemHeight("tall", dims), 160);
   assert.strictEqual(getGridItemHeight("missing", dims), 80);
   assert.strictEqual(getGridItemHeight("zero", dims), 80);
+});
+
+test("row span helper", () => {
+  const dims = { ...BASE, itemRowSpans: { t: 2, big: 5, zero: 0 } };
+  assert.strictEqual(getGridItemRowSpan("t", dims), 2);
+  assert.strictEqual(getGridItemRowSpan("big", dims), 5);
+  assert.strictEqual(getGridItemRowSpan("zero", dims), 1);
+  assert.strictEqual(getGridItemRowSpan("missing", dims), 1);
+});
+
+test("row-span items claim a full column and shorts pack around them", () => {
+  const dims = { ...BASE, itemRowSpans: { t: 2 } };
+  const positions = listToGridObject(
+    makeList(["t", "a", "b", "c", "d"]),
+    dims,
+    GridOrientation.Vertical
+  );
+
+  // t spans (0,0)-(1,0); shorts fill the remaining cells row-major
+  assert.strictEqual(positions.t.index, 0);
+  assert.strictEqual(positions.a.index, 1);
+  assert.strictEqual(positions.b.index, 2);
+  assert.strictEqual(positions.c.index, 4);
+  assert.strictEqual(positions.d.index, 5);
+  assert.strictEqual(positions.c.row, 1);
+  assert.strictEqual(positions.c.column, 1);
+  assert.strictEqual(positions.d.column, 2);
+
+  // Bands are sized by the shorts only — the span item derives its height
+  // from the bands, never the reverse.
+  const bands = computeGridBands(positions, dims, GridOrientation.Vertical, 5);
+  assert.deepStrictEqual(bands, [80, 80]);
+
+  assert.strictEqual(positions.t.y, 0);
+  assert.strictEqual(positions.a.y, 0);
+  assert.strictEqual(positions.c.y, 90);
+  assert.strictEqual(positions.d.y, 90);
+});
+
+test("row-span items stretch to the bands they cover", () => {
+  const dims = { ...BASE, itemRowSpans: { t: 2 } };
+  const positions = listToGridObject(
+    makeList(["t", "a", "b", "c", "d"]),
+    dims,
+    GridOrientation.Vertical
+  );
+  const bands = computeGridBands(positions, dims, GridOrientation.Vertical, 5);
+
+  assert.strictEqual(
+    getGridItemSpanHeight("t", positions.t.row, bands, 10, dims),
+    80 + 10 + 80
+  );
+  // Non-span items keep their own height
+  assert.strictEqual(getGridItemSpanHeight("a", positions.a.row, bands, 10, dims), 80);
+});
+
+test("late span anchors to the top row and shorts flow beneath", () => {
+  const dims = { ...BASE, itemRowSpans: { t: 2 } };
+  const positions = listToGridObject(
+    makeList(["a", "b", "c", "d", "e", "t"]),
+    dims,
+    GridOrientation.Vertical
+  );
+
+  // t anchors to row 0 of its column (slot 5 -> column 2)
+  assert.strictEqual(positions.t.row, 0);
+  assert.strictEqual(positions.t.column, 2);
+  // Shorts fill the remaining cells, flowing into a third row
+  assert.strictEqual(positions.a.index, 0);
+  assert.strictEqual(positions.b.index, 1);
+  assert.strictEqual(positions.c.index, 3);
+  assert.strictEqual(positions.d.index, 4);
+  assert.strictEqual(positions.e.row, 2);
+
+  const bands = computeGridBands(positions, dims, GridOrientation.Vertical, 6);
+  assert.deepStrictEqual(bands, [80, 80, 80]);
+
+  const { height } = calculateGridContentDimensions(
+    6,
+    dims,
+    GridOrientation.Vertical,
+    bands
+  );
+  assert.strictEqual(height, 3 * 80 + 2 * 10);
+});
+
+test("dragging a span low re-anchors it to the top with no orphan row", () => {
+  const dims = { ...BASE, itemRowSpans: { t: 2 } };
+  const positions = listToGridObject(
+    makeList(["1", "2", "3", "t", "4"]),
+    dims,
+    GridOrientation.Vertical
+  );
+
+  // [T][1][2] / [T][3][4] — nothing above the span, no dangling third row
+  assert.strictEqual(positions.t.row, 0);
+  assert.strictEqual(positions.t.column, 0);
+  assert.strictEqual(positions["1"].index, 1);
+  assert.strictEqual(positions["2"].index, 2);
+  assert.strictEqual(positions["3"].index, 4);
+  assert.strictEqual(positions["4"].index, 5);
+
+  const bands = computeGridBands(positions, dims, GridOrientation.Vertical, 5);
+  assert.strictEqual(bands.length, 2);
+  assert.deepStrictEqual(bands, [80, 80]);
+
+  const { height } = calculateGridContentDimensions(
+    5,
+    dims,
+    GridOrientation.Vertical,
+    bands
+  );
+  assert.strictEqual(height, 2 * 80 + 10);
+});
+
+test("insert reordering re-packs spans into a valid footprint", () => {
+  const dims = { ...BASE, itemRowSpans: { t: 2 } };
+  const positions = listToGridObject(
+    makeList(["t", "a", "b", "c", "d"]),
+    dims,
+    GridOrientation.Vertical
+  );
+
+  // Drag t onto a (index 1): t lands in column 1 spanning both rows
+  const moved = reorderGridInsert(positions, "t", 1, dims, GridOrientation.Vertical);
+
+  assert.strictEqual(moved.t.column, 1);
+  assert.strictEqual(moved.t.row, 0);
+  assert.strictEqual(moved.t.index, 1);
+  // [a][t][b] / [c][t][d]
+  assert.strictEqual(moved.a.index, 0);
+  assert.strictEqual(moved.b.index, 2);
+  assert.strictEqual(moved.c.index, 3);
+  assert.strictEqual(moved.d.index, 5);
+});
+
+test("hit testing maps a span item's lower cell back to the span item", () => {
+  const dims = { ...BASE, itemRowSpans: { t: 2 } };
+  const positions = listToGridObject(
+    makeList(["t", "a", "b", "c", "d"]),
+    dims,
+    GridOrientation.Vertical
+  );
+
+  // Cell (1,0) is covered by t's span (raw index 3 has no owner)
+  assert.strictEqual(
+    findItemIdAtCell(positions, 1, 0, dims, GridOrientation.Vertical),
+    "t"
+  );
+  assert.strictEqual(
+    findItemIdAtCell(positions, 0, 1, dims, GridOrientation.Vertical),
+    "a"
+  );
+
+  // Dragging d over the lower half of t targets t, and d re-packs before it
+  const sv = mockSharedValue<GridPositions>(positions);
+  setGridPosition(
+    0,
+    90,
+    0,
+    0,
+    5,
+    sv as any,
+    "d",
+    dims,
+    GridOrientation.Vertical,
+    GridStrategy.Insert
+  );
+  assert.strictEqual(sv.value.d.index, 0);
+  assert.strictEqual(sv.value.t.index, 1);
 });
 
 test("band geometry helpers", () => {

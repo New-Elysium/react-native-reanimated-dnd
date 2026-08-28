@@ -24,12 +24,31 @@ interface GridCard {
   height: number;
   color: string;
   tall: boolean;
+  rowSpan: number;
 }
 
 const SHORT_HEIGHT = 110;
-const TALL_HEIGHT = 180;
+const GAP = 12;
+const PADDING = 16;
+const COLUMNS = 3;
+// A row-span item stretches to the full height of the rows it covers.
+const TALL_HEIGHT = SHORT_HEIGHT * 2 + GAP;
+const windowWidth = Dimensions.get("window").width;
+
+const itemWidth = Math.floor(
+  (windowWidth - PADDING * 2 - GAP * (COLUMNS - 1)) / COLUMNS
+);
 
 const INITIAL_CARDS: GridCard[] = [
+  {
+    id: "item-3",
+    title: "Item 3",
+    description: "Description 3",
+    height: TALL_HEIGHT,
+    color: "#2D6CDF",
+    tall: true,
+    rowSpan: 2,
+  },
   {
     id: "item-1",
     title: "Item 1",
@@ -37,6 +56,7 @@ const INITIAL_CARDS: GridCard[] = [
     height: SHORT_HEIGHT,
     color: "#E4574C",
     tall: false,
+    rowSpan: 1,
   },
   {
     id: "item-2",
@@ -45,14 +65,7 @@ const INITIAL_CARDS: GridCard[] = [
     height: SHORT_HEIGHT,
     color: "#1F8A8A",
     tall: false,
-  },
-  {
-    id: "item-3",
-    title: "Item 3",
-    description: "Description 3",
-    height: TALL_HEIGHT,
-    color: "#2D6CDF",
-    tall: true,
+    rowSpan: 1,
   },
   {
     id: "item-4",
@@ -61,6 +74,7 @@ const INITIAL_CARDS: GridCard[] = [
     height: SHORT_HEIGHT,
     color: "#2E9E4F",
     tall: false,
+    rowSpan: 1,
   },
   {
     id: "item-5",
@@ -69,17 +83,9 @@ const INITIAL_CARDS: GridCard[] = [
     height: SHORT_HEIGHT,
     color: "#D9A514",
     tall: false,
+    rowSpan: 1,
   },
 ];
-
-const GAP = 12;
-const PADDING = 16;
-const COLUMNS = 3;
-const windowWidth = Dimensions.get("window").width;
-
-const itemWidth = Math.floor(
-  (windowWidth - PADDING * 2 - GAP * (COLUMNS - 1)) / COLUMNS
-);
 
 interface DynamicGridExampleProps {
   onBack: () => void;
@@ -96,6 +102,16 @@ export function DynamicGridExample({ onBack }: DynamicGridExampleProps) {
     return map;
   }, [data]);
 
+  const itemRowSpans = useMemo(() => {
+    const map: { [id: string]: number } = {};
+    data.forEach((card) => {
+      if (card.rowSpan > 1) {
+        map[card.id] = card.rowSpan;
+      }
+    });
+    return map;
+  }, [data]);
+
   const gridDimensions = useMemo(
     () => ({
       columns: COLUMNS,
@@ -104,8 +120,9 @@ export function DynamicGridExample({ onBack }: DynamicGridExampleProps) {
       rowGap: GAP,
       columnGap: GAP,
       itemHeights,
+      itemRowSpans,
     }),
-    [itemHeights]
+    [itemHeights, itemRowSpans]
   );
 
   const handleDrop = useCallback(
@@ -201,8 +218,8 @@ export function DynamicGridExample({ onBack }: DynamicGridExampleProps) {
 
       <View style={styles.instructionBar}>
         <Text style={styles.instructionText}>
-          Drag to reorder. Rows size to their tallest item — watch the TALL
-          card reshape the grid as it moves.
+          Drag to reorder. The TALL card spans two rows — short cards pack
+          around it wherever it goes.
         </Text>
       </View>
 
