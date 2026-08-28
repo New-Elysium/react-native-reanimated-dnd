@@ -512,30 +512,33 @@ export function calculateGridContentDimensions(
     // Calculate number of rows needed
     const totalRows = Math.ceil(itemsCount / columns);
     const width = columns * itemWidth + (columns - 1) * columnGap;
+    let bandTotal = 0;
+    if (bandHeights && bandHeights.length > 0) {
+      for (let i = 0; i < bandHeights.length; i++) {
+        bandTotal += bandHeights[i];
+      }
+    }
     const height =
       bandHeights && bandHeights.length > 0
-        ? sumBandHeights(bandHeights) + (bandHeights.length - 1) * rowGap
+        ? bandTotal + (bandHeights.length - 1) * rowGap
         : totalRows * itemHeight + (totalRows - 1) * rowGap;
     return { width, height };
   } else {
     // Calculate number of columns needed
     const totalColumns = Math.ceil(itemsCount / rows);
     const width = totalColumns * itemWidth + (totalColumns - 1) * columnGap;
+    let bandTotal = 0;
+    if (bandHeights && bandHeights.length > 0) {
+      for (let i = 0; i < bandHeights.length; i++) {
+        bandTotal += bandHeights[i];
+      }
+    }
     const height =
       bandHeights && bandHeights.length > 0
-        ? sumBandHeights(bandHeights) + (bandHeights.length - 1) * rowGap
+        ? bandTotal + (bandHeights.length - 1) * rowGap
         : rows * itemHeight + (rows - 1) * rowGap;
     return { width, height };
   }
-}
-
-function sumBandHeights(bandHeights: number[]): number {
-  "worklet";
-  let total = 0;
-  for (let i = 0; i < bandHeights.length; i++) {
-    total += bandHeights[i];
-  }
-  return total;
 }
 
 /**
