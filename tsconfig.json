@@ -1,15 +1,17 @@
 {
   "compilerOptions": {
     "target": "ES2018",
-    "lib": ["ES2018"],
+    "lib": [
+      "ES2018"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
-    "module": "commonjs",
+    "moduleResolution": "bundler",
+    "module": "preserve",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": false,
@@ -20,7 +22,9 @@
     "outDir": "./lib",
     "rootDir": "./",
     "jsx": "react-jsx",
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "stripInternal": true,
     "noEmitHelpers": false,
     "importHelpers": false
@@ -39,5 +43,6 @@
     "example-app",
     "**/*.test.ts",
     "**/*.test.tsx"
-  ]
-}   
+  ],
+  "extends": "expo/tsconfig.base"
+}

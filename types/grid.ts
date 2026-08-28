@@ -188,7 +188,7 @@ export interface UseGridSortableListReturn<TData extends SortableData> {
   scrollViewRef: any;
 
   /** Ref for the DropProvider context */
-  dropProviderRef: React.RefObject<DropProviderRef>;
+  dropProviderRef: React.RefObject<DropProviderRef | null>;
 
   /** Animated scroll handler */
   handleScroll: any;
