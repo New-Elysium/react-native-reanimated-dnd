@@ -119,7 +119,8 @@ export function useGridSortable<T>(
       }
 
       // Calculate target cell for hit detection (band-aware for variable
-      // heights, scroll-adjusted to match setGridPosition)
+      // heights; current.x/current.y are content-space coordinates produced
+      // by the pan gesture, so no scroll adjustment is applied here)
       const bandHeights = computeGridBands(
         positions.value,
         dimensions,
@@ -127,8 +128,8 @@ export function useGridSortable<T>(
         itemsCount
       );
       const targetCell = getGridCellFromCoordinates(
-        current.x + scrollX.value,
-        current.y + scrollY.value,
+        current.x,
+        current.y,
         dimensions,
         orientation,
         itemsCount,
@@ -173,8 +174,6 @@ export function useGridSortable<T>(
       setGridPosition(
         current.x,
         current.y,
-        scrollX.value,
-        scrollY.value,
         itemsCount,
         positions,
         id,

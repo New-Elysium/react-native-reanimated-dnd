@@ -177,7 +177,7 @@ test("reordering is a no-op when the index is unchanged", () => {
   );
 });
 
-test("setGridPosition hit tests with scroll and reorders (insert)", () => {
+test("setGridPosition hit tests with content-space coords and reorders (insert)", () => {
   const dims = { ...BASE, itemHeights: { tall: 160 } };
   const positions = listToGridObject(
     makeList(["a", "b", "tall", "d", "e"]),
@@ -186,12 +186,12 @@ test("setGridPosition hit tests with scroll and reorders (insert)", () => {
   );
   const sv = mockSharedValue<GridPositions>(positions);
 
-  // Drag "e" (index 4) over slot index 2, with scroll offset applied
+  // Drag "e" (index 4) over slot index 2 with content-space coords. The pan
+  // gesture produces content-space (item's top/left), so setGridPosition
+  // does not add scroll here.
   setGridPosition(
     220,
-    -50,
     0,
-    50,
     5,
     sv as any,
     "e",
@@ -428,8 +428,6 @@ test("hit testing maps a span item's lower cell back to the span item", () => {
   setGridPosition(
     0,
     90,
-    0,
-    0,
     5,
     sv as any,
     "d",
@@ -506,8 +504,6 @@ test("hit testing maps a column-span item's second cell back to it", () => {
   const sv = mockSharedValue<GridPositions>(positions);
   setGridPosition(
     110,
-    0,
-    0,
     0,
     5,
     sv as any,
@@ -738,8 +734,6 @@ test("setGridPosition swap strategy swaps with the footprint owner", () => {
   setGridPosition(
     0,
     90,
-    0,
-    0,
     5,
     sv as any,
     "d",
@@ -767,8 +761,6 @@ test("setGridPosition is a no-op over the item's own cell", () => {
   setGridPosition(
     50,
     200,
-    0,
-    0,
     5,
     sv as any,
     "d",
@@ -860,6 +852,40 @@ test("content dimensions fall back to uniform geometry without bands", () => {
   );
   assert.strictEqual(horizontal.width, 2 * 100 + 10);
   assert.strictEqual(horizontal.height, 2 * 80 + 10);
+});
+
+test("setGridPosition does not apply scroll (content-space input, regression for #86)", () => {
+  // Regression for the drift-on-scrolled-grid bug: the pan gesture produces
+  // content-space coordinates (positionX/Y include scrollDelta), so adding
+  // scroll inside setGridPosition double-counted it and shifted the drop
+  // target downward by ~scrollY / rowStride rows.
+  const dims = BASE;
+  const positions = listToGridObject(
+    makeList(["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]),
+    dims,
+    GridOrientation.Vertical
+  );
+  const before = JSON.stringify(positions);
+
+  // Item "a" sits at row 0, column 0. The pan gesture reports content-space
+  // coords for the drag: top of cell (0,0). Pre-fix, with scrollY = 450, the
+  // hook would pass x=0,y=0 to setGridPosition and it would add 450 to y
+  // before hit-testing — moving the drop target into row 5.
+  const sv = mockSharedValue<GridPositions>(positions);
+  setGridPosition(
+    0,
+    0,
+    10,
+    sv as any,
+    "a",
+    dims,
+    GridOrientation.Vertical,
+    GridStrategy.Insert
+  );
+
+  // Without scroll, dropping "a" on its own cell must be a no-op (issue #86
+  // would otherwise reorder it down the list).
+  assert.strictEqual(JSON.stringify(sv.value), before);
 });
 
 test("setGridAutoScroll picks direction near container edges", () => {

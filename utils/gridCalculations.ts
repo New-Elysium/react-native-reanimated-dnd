@@ -691,13 +691,13 @@ export function reorderGridSwap(
 
 /**
  * Update grid positions based on drag position.
- * Hit testing uses pre-reorder band geometry; reordering re-lays out.
+ * (x, y) are content-space coordinates (already scroll-compensated by the
+ * pan gesture). Hit testing uses pre-reorder band geometry; reordering
+ * re-lays out.
  */
 export function setGridPosition(
   x: number,
   y: number,
-  scrollX: number,
-  scrollY: number,
   itemsCount: number,
   positions: SharedValue<GridPositions>,
   id: string,
@@ -707,10 +707,9 @@ export function setGridPosition(
 ): void {
   "worklet";
 
-  // Adjust coordinates for scroll offset
-  const adjustedX = x + scrollX;
-  const adjustedY = y + scrollY;
-
+  // (x, y) are content-space coordinates — the same space as the dragged
+  // item's top/left — so no scroll adjustment is applied here. Adding the
+  // scroll offset would double-count it and drift the drop target.
   const bandHeights = computeGridBands(
     positions.value,
     dimensions,
@@ -720,8 +719,8 @@ export function setGridPosition(
 
   // Get target cell
   const targetCell = getGridCellFromCoordinates(
-    adjustedX,
-    adjustedY,
+    x,
+    y,
     dimensions,
     orientation,
     itemsCount,
