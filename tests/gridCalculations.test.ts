@@ -4,6 +4,7 @@ import {
   calculateGridPosition,
   calculateGridContentDimensions,
   computeGridBands,
+  computeGridBandHeights,
   findItemIdAtCell,
   getGridBandFromY,
   getGridBandTop,
@@ -16,9 +17,10 @@ import {
   listToGridObject,
   reorderGridInsert,
   reorderGridSwap,
+  setGridAutoScroll,
   setGridPosition,
 } from "../utils/gridCalculations";
-import { GridOrientation, GridStrategy } from "../types/grid";
+import { GridOrientation, GridScrollDirection, GridStrategy } from "../types/grid";
 import type { GridPositions } from "../types/grid";
 
 const BASE = {
@@ -531,4 +533,373 @@ test("band geometry helpers", () => {
   assert.strictEqual(getGridBandFromY(0, [160, 80], 10), 0);
   assert.strictEqual(getGridBandFromY(170, [160, 80], 10), 1);
   assert.strictEqual(getGridBandFromY(-5, [160, 80], 10), 0);
+});
+
+test("computeGridBandHeights handles sparse, negative, and empty inputs", () => {
+  const dims = { ...BASE, itemRowSpans: { t: 2 } };
+
+  // Sparse layout (a span pushes e to index 6 with itemsCount 6): band 2
+  // still counts and is sized by the short that occupies it.
+  assert.deepStrictEqual(
+    computeGridBandHeights(
+      { a: 0, b: 1, t: 2, c: 3, d: 4, e: 6 },
+      dims,
+      GridOrientation.Vertical,
+      6
+    ),
+    [80, 80, 80]
+  );
+
+  // Negative entries are ignored
+  assert.deepStrictEqual(
+    computeGridBandHeights(
+      { a: 0, ghost: -1 },
+      dims,
+      GridOrientation.Vertical,
+      1
+    ),
+    [80]
+  );
+
+  // No entries at all falls back to uniform rows
+  assert.deepStrictEqual(
+    computeGridBandHeights({}, dims, GridOrientation.Vertical, 5),
+    [80, 80]
+  );
+});
+
+test("a span crossing the last row extends the band count", () => {
+  const dims = { ...BASE, itemRowSpans: { t: 2 } };
+
+  // t sits at index 3 (row 1) and spans into row 2: bands 1 and 2 hold no
+  // shorts but must exist so t's stretched height fits inside the content.
+  const bands = computeGridBandHeights(
+    { a: 0, b: 1, c: 2, t: 3 },
+    dims,
+    GridOrientation.Vertical,
+    4
+  );
+  assert.deepStrictEqual(bands, [80, 80, 80]);
+
+  const { height } = calculateGridContentDimensions(
+    4,
+    dims,
+    GridOrientation.Vertical,
+    bands
+  );
+  assert.strictEqual(height, 3 * 80 + 2 * 10);
+});
+
+test("two spans anchor to separate columns and shorts flow beneath", () => {
+  const dims = { ...BASE, itemRowSpans: { t1: 2, t2: 2 } };
+  const positions = listToGridObject(
+    makeList(["t1", "t2", "a", "b", "c"]),
+    dims,
+    GridOrientation.Vertical
+  );
+
+  // [t1][t2][a] / [t1][t2][b] / [c]
+  assert.strictEqual(positions.t1.column, 0);
+  assert.strictEqual(positions.t2.column, 1);
+  assert.strictEqual(positions.a.index, 2);
+  assert.strictEqual(positions.b.index, 5);
+  assert.strictEqual(positions.c.row, 2);
+  assert.strictEqual(positions.c.y, 180);
+
+  const bands = computeGridBands(positions, dims, GridOrientation.Vertical, 5);
+  assert.deepStrictEqual(bands, [80, 80, 80]);
+  // Both spans stretch over bands 0-1
+  assert.strictEqual(
+    getGridItemSpanHeight("t1", positions.t1.row, bands, 10, dims),
+    80 + 10 + 80
+  );
+});
+
+test("row spans stretch over variable band heights", () => {
+  const dims = { ...BASE, itemRowSpans: { t: 2 }, itemHeights: { c: 160 } };
+  const positions = listToGridObject(
+    makeList(["t", "a", "b", "c"]),
+    dims,
+    GridOrientation.Vertical
+  );
+
+  // [t][a][b] / [t][c] — band 1 sizes to c, and t stretches over both
+  const bands = computeGridBands(positions, dims, GridOrientation.Vertical, 4);
+  assert.deepStrictEqual(bands, [80, 160]);
+  assert.strictEqual(positions.c.y, 90);
+  assert.strictEqual(
+    getGridItemSpanHeight("t", positions.t.row, bands, 10, dims),
+    80 + 10 + 160
+  );
+
+  const { height } = calculateGridContentDimensions(
+    4,
+    dims,
+    GridOrientation.Vertical,
+    bands
+  );
+  assert.strictEqual(height, 80 + 160 + 10);
+});
+
+test("insert reordering handles target indices that no item occupies", () => {
+  const dims = { ...BASE, itemRowSpans: { t: 2 } };
+  const positions = listToGridObject(
+    makeList(["a", "b", "c", "d", "e", "t"]),
+    dims,
+    GridOrientation.Vertical
+  );
+  // Packed indices are sparse: e sits at 6 with itemsCount 6, so index 5
+  // has no owner
+
+  // Moving down to an unoccupied index appends to the sequence
+  const appended = reorderGridInsert(
+    positions,
+    "a",
+    5,
+    dims,
+    GridOrientation.Vertical
+  );
+  assert.strictEqual(appended.a.row, 2);
+  assert.strictEqual(appended.t.column, 1);
+
+  // Moving up to an unoccupied index inserts at the front; the final cell
+  // index comes from re-packing, not the sequence slot
+  const prepended = reorderGridInsert(
+    positions,
+    "e",
+    5,
+    dims,
+    GridOrientation.Vertical
+  );
+  assert.strictEqual(prepended.e.index, 1);
+  assert.strictEqual(prepended.t.column, 0);
+  assert.strictEqual(prepended.d.row, 2);
+});
+
+test("reordering with an unknown item is a no-op", () => {
+  const dims = { ...BASE, itemRowSpans: { t: 2 } };
+  const positions = listToGridObject(
+    makeList(["t", "a", "b", "c", "d"]),
+    dims,
+    GridOrientation.Vertical
+  );
+  assert.strictEqual(
+    reorderGridInsert(positions, "ghost", 2, dims, GridOrientation.Vertical),
+    positions
+  );
+  assert.strictEqual(
+    reorderGridSwap(positions, "ghost", "a", dims, GridOrientation.Vertical),
+    positions
+  );
+  assert.strictEqual(
+    reorderGridSwap(positions, "a", "ghost", dims, GridOrientation.Vertical),
+    positions
+  );
+});
+
+test("swap reordering re-packs column spans", () => {
+  const dims = { ...BASE, itemColumnSpans: { w: 2 } };
+  const positions = listToGridObject(
+    makeList(["w", "a", "b", "c", "d"]),
+    dims,
+    GridOrientation.Vertical
+  );
+
+  const swapped = reorderGridSwap(
+    positions,
+    "w",
+    "b",
+    dims,
+    GridOrientation.Vertical
+  );
+
+  // New sequence [b, a, w, c, d]: row 0 fills with shorts, w wraps to (1,0)
+  assert.strictEqual(swapped.b.index, 0);
+  assert.strictEqual(swapped.a.index, 1);
+  assert.strictEqual(swapped.c.index, 2);
+  assert.strictEqual(swapped.w.row, 1);
+  assert.strictEqual(swapped.w.column, 0);
+  assert.strictEqual(swapped.d.index, 5);
+
+  const bands = computeGridBands(swapped, dims, GridOrientation.Vertical, 5);
+  assert.deepStrictEqual(bands, [80, 80]);
+});
+
+test("setGridPosition swap strategy swaps with the footprint owner", () => {
+  const dims = { ...BASE, itemRowSpans: { t: 2 } };
+  const positions = listToGridObject(
+    makeList(["t", "a", "b", "c", "d"]),
+    dims,
+    GridOrientation.Vertical
+  );
+  const sv = mockSharedValue<GridPositions>(positions);
+
+  // Drag d over t's lower cell (1,0): the cell resolves to t, swap d <-> t
+  setGridPosition(
+    0,
+    90,
+    0,
+    0,
+    5,
+    sv as any,
+    "d",
+    dims,
+    GridOrientation.Vertical,
+    GridStrategy.Swap
+  );
+
+  assert.strictEqual(sv.value.d.index, 0);
+  assert.strictEqual(sv.value.t.index, 1);
+  assert.strictEqual(sv.value.t.column, 1);
+});
+
+test("setGridPosition is a no-op over the item's own cell", () => {
+  const dims = { ...BASE, itemHeights: { tall: 160 } };
+  const positions = listToGridObject(
+    makeList(["a", "b", "tall", "d", "e"]),
+    dims,
+    GridOrientation.Vertical
+  );
+  const sv = mockSharedValue<GridPositions>(positions);
+
+  // d occupies band 1, column 0 (index 3): dragging inside its own cell
+  // leaves positions untouched
+  setGridPosition(
+    50,
+    200,
+    0,
+    0,
+    5,
+    sv as any,
+    "d",
+    dims,
+    GridOrientation.Vertical,
+    GridStrategy.Insert
+  );
+  assert.strictEqual(sv.value, positions);
+});
+
+test("findItemIdAtCell returns null for empty cells and ignores spans horizontally", () => {
+  const spanDims = { ...BASE, itemRowSpans: { t: 2 } };
+  const positions = listToGridObject(
+    makeList(["t", "a", "b", "c", "d"]),
+    spanDims,
+    GridOrientation.Vertical
+  );
+  // Row 2 is beyond every footprint
+  assert.strictEqual(
+    findItemIdAtCell(positions, 2, 0, spanDims, GridOrientation.Vertical),
+    null
+  );
+
+  // Horizontal grids have no spans: cell (0,1) is simply c
+  const horizontal = listToGridObject(
+    makeList(["a", "b", "c", "d"]),
+    BASE,
+    GridOrientation.Horizontal
+  );
+  assert.strictEqual(
+    findItemIdAtCell(horizontal, 0, 1, BASE, GridOrientation.Horizontal),
+    "c"
+  );
+});
+
+test("horizontal grids ignore row spans", () => {
+  const dims = { ...BASE, itemRowSpans: { t: 2 } };
+  const positions = listToGridObject(
+    makeList(["t", "a", "b", "c"]),
+    dims,
+    GridOrientation.Horizontal
+  );
+
+  // Pure column-major arithmetic over the fixed rows
+  assert.strictEqual(positions.t.index, 0);
+  assert.strictEqual(positions.t.row, 0);
+  assert.strictEqual(positions.a.index, 1);
+  assert.strictEqual(positions.a.row, 1);
+  assert.strictEqual(positions.b.index, 2);
+  assert.strictEqual(positions.c.index, 3);
+});
+
+test("hit testing clamps out-of-range coordinates", () => {
+  // Far below the content clamps to the last valid index
+  const below = getGridCellFromCoordinates(
+    220,
+    10000,
+    BASE,
+    GridOrientation.Vertical,
+    5
+  );
+  assert.strictEqual(below.index, 4);
+  assert.strictEqual(below.row, 1);
+  // Above the content clamps to the first cell
+  const above = getGridCellFromCoordinates(
+    220,
+    -50,
+    BASE,
+    GridOrientation.Vertical,
+    5
+  );
+  assert.strictEqual(above.index, 0);
+  assert.strictEqual(above.row, 0);
+});
+
+test("content dimensions fall back to uniform geometry without bands", () => {
+  const vertical = calculateGridContentDimensions(
+    5,
+    BASE,
+    GridOrientation.Vertical
+  );
+  assert.strictEqual(vertical.width, 3 * 100 + 2 * 10);
+  assert.strictEqual(vertical.height, 2 * 80 + 10);
+
+  const horizontal = calculateGridContentDimensions(
+    4,
+    BASE,
+    GridOrientation.Horizontal
+  );
+  assert.strictEqual(horizontal.width, 2 * 100 + 10);
+  assert.strictEqual(horizontal.height, 2 * 80 + 10);
+});
+
+test("setGridAutoScroll picks direction near container edges", () => {
+  const run = (x: number, y: number, scrollX = 0, scrollY = 0) => {
+    const dir = mockSharedValue<GridScrollDirection>(GridScrollDirection.None);
+    setGridAutoScroll(x, y, scrollX, scrollY, 200, 200, 40, dir as any);
+    return dir.value;
+  };
+
+  assert.strictEqual(run(100, 100), GridScrollDirection.None);
+  assert.strictEqual(run(10, 100), GridScrollDirection.Left);
+  assert.strictEqual(run(190, 100), GridScrollDirection.Right);
+  assert.strictEqual(run(100, 10), GridScrollDirection.Up);
+  assert.strictEqual(run(100, 190), GridScrollDirection.Down);
+  assert.strictEqual(run(10, 10), GridScrollDirection.UpLeft);
+  assert.strictEqual(run(190, 10), GridScrollDirection.UpRight);
+  assert.strictEqual(run(10, 190), GridScrollDirection.DownLeft);
+  assert.strictEqual(run(190, 190), GridScrollDirection.DownRight);
+  // Bounds shift with the scroll offset
+  assert.strictEqual(run(60, 100, 50, 0), GridScrollDirection.Left);
+});
+
+test("height and span helper edge cases", () => {
+  const dims = {
+    ...BASE,
+    itemHeights: { neg: -20, t: 160 },
+    itemRowSpans: { f: 2.7, t: 3 },
+  };
+
+  // Non-positive custom heights fall back to the default
+  assert.strictEqual(getGridItemHeight("neg", dims), 80);
+  // Fractional spans floor to whole rows
+  assert.strictEqual(getGridItemRowSpan("f", dims), 2);
+
+  // A span longer than the available bands covers what exists
+  assert.strictEqual(
+    getGridItemSpanHeight("t", 0, [80, 80], 10, dims),
+    80 + 10 + 80
+  );
+  // No covering band falls back to the item's own height
+  assert.strictEqual(getGridItemSpanHeight("t", 1, [80], 10, dims), 160);
+  assert.strictEqual(getGridItemSpanHeight("t", 0, [], 10, dims), 160);
 });

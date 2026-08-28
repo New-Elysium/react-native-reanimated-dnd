@@ -70,6 +70,7 @@ export function useGridSortableList<TData extends SortableData>(
       dimensions.columnGap,
       dimensions.itemHeights,
       dimensions.itemRowSpans,
+      dimensions.itemColumnSpans,
       orientation,
     ]
   );
